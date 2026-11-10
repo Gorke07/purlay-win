@@ -8,6 +8,7 @@
 //!   owns a named pipe and later ones hand their arguments to it and exit.
 //! - **Toasts, the taskbar and launch at login.**
 
+pub mod badge;
 pub mod instance;
 pub mod sound;
 

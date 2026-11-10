@@ -225,6 +225,19 @@ impl Render for SettingsPage {
                         ),
                         cx,
                     ))
+                    .child(row(
+                        t("settings.notify.badge"),
+                        None,
+                        Switch::new("taskbar-badge").checked(!prefs.hide_taskbar_badge).on_change({
+                            let p = p3.clone();
+                            move |on, _, cx| {
+                                p.update(|d| d.hide_taskbar_badge = !*on);
+                                crate::tray::sync_attention(&crate::state::app(cx), cx);
+                                cx.refresh_windows();
+                            }
+                        }).into_any_element(),
+                        cx,
+                    ))
                     .child(row(t("settings.notify.sound"), None, Switch::new("sound").checked(prefs.notification_sound).on_change(move |on, _, cx| {
                         p2.update(|d| d.notification_sound = *on);
                         cx.refresh_windows();

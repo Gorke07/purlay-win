@@ -50,6 +50,7 @@ impl RootView {
         }));
         subs.push(cx.observe_window_activation(window, |this, window, cx| {
             let active = window.is_window_active();
+            crate::tray::refresh_badge();
             this.app.update(cx, |m, cx| m.set_window_active(active, cx));
         }));
         // Prefill the last server.
@@ -182,15 +183,6 @@ impl Render for RootView {
                 .into_any_element(),
             Phase::Ready(_) => self.main.clone().map(|m| m.into_any_element()).unwrap_or_else(|| div().into_any_element()),
         };
-        let title_text = if ready {
-            let n = self.app.read(cx).session().map(|s| s.store().read_recursive().attention_count()).unwrap_or(0);
-            if n > 0 { format!("Purlay ({n})") } else { "Purlay".to_string() }
-        } else {
-            "Purlay".to_string()
-        };
-        window.set_window_title(&title_text);
-        let waiting = if ready { self.app.read(cx).session().map(|s| s.store().read_recursive().attention_count()).unwrap_or(0) } else { 0 };
-        crate::tray::set_unread(waiting, cx);
         // Signed in, the main view draws the frame (sidebar to the top, toolbar beside the
         // caption buttons); before that, a bare draggable strip is enough.
         v_flex()

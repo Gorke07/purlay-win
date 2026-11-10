@@ -149,7 +149,7 @@ pub fn hide_window(window: &Window) {
 }
 
 /// Shows the window again if hidden, then brings it to the front.
-pub fn show_window(window: &mut Window) {
+pub fn show_window(window: &mut Window, cx: &App) {
     #[cfg(windows)]
     if let Some(h) = hwnd(window) {
         use windows::Win32::UI::WindowsAndMessaging::{IsWindowVisible, ShowWindow, SW_SHOW};
@@ -160,6 +160,19 @@ pub fn show_window(window: &mut Window) {
         }
     }
     window.activate_window();
+    refresh_badge_soon(cx);
+}
+
+/// Lays the badge on again once Windows has (re)made the taskbar button, which happens a
+/// moment after the window is shown; the overlay set before that is dropped.
+pub fn refresh_badge_soon(cx: &App) {
+    for ms in [400u64, 1500, 4000] {
+        cx.spawn(async move |cx| {
+            cx.background_executor().timer(std::time::Duration::from_millis(ms)).await;
+            refresh_badge();
+        })
+        .detach();
+    }
 }
 
 #[cfg(windows)]
@@ -168,6 +181,57 @@ fn hwnd(window: &Window) -> Option<windows::Win32::Foundation::HWND> {
     match HasWindowHandle::window_handle(window).ok()?.as_raw() {
         RawWindowHandle::Win32(h) => Some(windows::Win32::Foundation::HWND(h.hwnd.get() as *mut _)),
         _ => None,
+    }
+}
+
+// --- the taskbar badge --------------------------------------------------------------
+
+use std::sync::atomic::{AtomicI64, AtomicIsize, Ordering};
+
+static MAIN_HWND: AtomicIsize = AtomicIsize::new(0);
+static BADGE: AtomicI64 = AtomicI64::new(0);
+
+/// Remembers the main window, whose taskbar button carries the badge.
+pub fn set_main_window(window: &Window) {
+    #[cfg(windows)]
+    if let Some(h) = hwnd(window) {
+        MAIN_HWND.store(h.0 as isize, Ordering::Relaxed);
+    }
+}
+
+/// Shows `n` on the taskbar button (nothing when 0 or turned off in Settings).
+pub fn set_badge(n: i64, enabled: bool) {
+    let v = if enabled { n.max(0) } else { 0 };
+    if BADGE.swap(v, Ordering::Relaxed) != v {
+        apply_badge(v);
+    }
+}
+
+/// Lays the badge on again: Windows drops it when the taskbar button is made anew
+/// (the window shown after hiding, Explorer restarted).
+pub fn refresh_badge() {
+    apply_badge(BADGE.load(Ordering::Relaxed));
+}
+
+fn apply_badge(n: i64) {
+    let describe = if n > 0 { crate::i18n::tf("tray.unread", &[&n]) } else { String::new() };
+    purlay_platform::badge::set(MAIN_HWND.load(Ordering::Relaxed), n as u32, &describe);
+}
+
+
+/// Brings the waiting count to every place outside the page: the window title, the
+/// tray icon and the taskbar badge. Runs from the app's change observer, not from
+/// drawing, so it keeps up while the window is minimized or hidden.
+pub fn sync_attention(app: &Entity<crate::state::AppModel>, cx: &mut App) {
+    let model = app.read(cx);
+    let ready = matches!(model.phase, crate::state::Phase::Ready(_));
+    let n = if ready { model.session().map(|s| s.store().read_recursive().attention_count()).unwrap_or(0) } else { 0 };
+    let show_badge = !model.prefs.get().hide_taskbar_badge;
+    set_unread(n, cx);
+    set_badge(n, show_badge);
+    let title = if n > 0 { format!("Purlay ({n})") } else { "Purlay".to_string() };
+    if let Some(main) = cx.try_global::<crate::banner::MainWindow>().map(|m| m.0) {
+        let _ = main.update(cx, |_, w, _| w.set_window_title(&title));
     }
 }
 

@@ -136,6 +136,12 @@ fn main() {
         })
         .expect("open window");
         cx.set_global(banner::MainWindow(window));
+        let _ = window.update(cx, |_, w, _| tray::set_main_window(w));
+        // The taskbar button is made a moment after the window shows.
+        tray::refresh_badge_soon(cx);
+        // The waiting count, kept current even while the window is hidden.
+        cx.observe(&app, |app, cx| tray::sync_attention(&app, cx)).detach();
+        tray::sync_attention(&app, cx);
 
         // The tray: a click shows the window, the menu opens settings or quits.
         if let Some(mut commands) = tray::install(cx) {
@@ -145,9 +151,9 @@ fn main() {
                 while let Some(cmd) = commands.recv().await {
                     cx.update(|cx| {
                         let _ = window.update(cx, |_, window, cx| match cmd {
-                            tray::TrayCommand::Show => tray::show_window(window),
+                            tray::TrayCommand::Show => tray::show_window(window, cx),
                             tray::TrayCommand::Settings => {
-                                tray::show_window(window);
+                                tray::show_window(window, cx);
                                 app3.update(cx, |m, cx| m.open_settings(cx));
                             }
                             tray::TrayCommand::Quit => save_window(&prefs4, window),
@@ -175,7 +181,7 @@ fn main() {
                     if let Some(u) = url {
                         app2.update(cx, |m, cx| m.handle_url(u, cx));
                     }
-                    let _ = window.update(cx, |_, window, _| tray::show_window(window));
+                    let _ = window.update(cx, |_, window, cx| tray::show_window(window, cx));
                 });
             }
         })

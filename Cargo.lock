@@ -5447,6 +5447,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "tauri-winrt-notification 0.7.3",
+ "tiny-skia",
  "tokio",
  "tracing",
  "windows 0.61.3",

@@ -78,6 +78,8 @@ pub struct Data {
     pub notification_sound: bool,
     pub notification_tone: NotificationTone,
     pub notification_style: NotificationStyle,
+    /// No count on the taskbar button.
+    pub hide_taskbar_badge: bool,
     /// Closing the window quits instead of leaving Purlay in the notification area.
     pub quit_on_close: bool,
     /// The one-time still running notice was shown.

@@ -205,7 +205,7 @@ impl BannerView {
         let app = crate::state::app(cx);
         app.update(cx, |m, cx| m.handle_url(link, cx));
         if let Some(main) = cx.try_global::<MainWindow>().map(|m| m.0) {
-            let _ = main.update(cx, |_, w, _| crate::tray::show_window(w));
+            let _ = main.update(cx, |_, w, cx| crate::tray::show_window(w, cx));
         }
         self.close(window, cx);
     }
