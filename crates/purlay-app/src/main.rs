@@ -157,7 +157,28 @@ fn main() {
                                 app3.update(cx, |m, cx| m.open_settings(cx));
                             }
                             tray::TrayCommand::Quit => save_window(&prefs4, window),
+                            _ => {}
                         });
+                        // Status, from the tray without opening the window.
+                        let session = app3.read(cx).session().cloned();
+                        let ws = tray::current_workspace(app3.read(cx));
+                        if let Some(s) = session {
+                            match cmd {
+                                tray::TrayCommand::Online => drop(s.set_away(false)),
+                                tray::TrayCommand::Away => drop(s.set_away(true)),
+                                tray::TrayCommand::DeepWork(mins) => {
+                                    if let Some(w) = ws {
+                                        drop(s.set_deep_work(&w, Some(sidebar::deep_work_until(mins))));
+                                    }
+                                }
+                                tray::TrayCommand::EndDeepWork => {
+                                    if let Some(w) = ws {
+                                        drop(s.set_deep_work(&w, None));
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
                         if cmd == tray::TrayCommand::Quit {
                             cx.quit();
                         }

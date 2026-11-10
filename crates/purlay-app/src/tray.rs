@@ -12,6 +12,12 @@ pub enum TrayCommand {
     Show,
     Settings,
     Quit,
+    /// Clears a chosen away.
+    Online,
+    Away,
+    /// Deep Work for this many minutes (-1: until tomorrow 09:00).
+    DeepWork(i64),
+    EndDeepWork,
 }
 
 const SIZE: u32 = 32;
@@ -19,6 +25,8 @@ const SIZE: u32 = 32;
 pub struct Tray {
     #[cfg(windows)]
     icon: tray_icon::TrayIcon,
+    #[cfg(windows)]
+    status: StatusItems,
     base: Vec<u8>,
     shown: Cell<Option<i64>>,
 }
@@ -58,6 +66,16 @@ fn with_dot(base: &[u8]) -> Vec<u8> {
     out
 }
 
+/// The menu items that show the person's status, updated as it changes.
+#[cfg(windows)]
+struct StatusItems {
+    online: tray_icon::menu::CheckMenuItem,
+    away: tray_icon::menu::CheckMenuItem,
+    deep: tray_icon::menu::Submenu,
+    deep_end: tray_icon::menu::MenuItem,
+    shown: Cell<Option<(bool, Option<i64>)>>,
+}
+
 /// Puts the icon in the notification area; its clicks and menu choices arrive on the
 /// returned receiver.
 #[cfg(windows)]
@@ -65,30 +83,48 @@ pub fn install(cx: &mut App) -> Option<tokio::sync::mpsc::UnboundedReceiver<Tray
     use tray_icon::menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem};
     use tray_icon::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 
+    use tray_icon::menu::{CheckMenuItem, Submenu};
     let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
     let open = MenuItem::new(t("tray.open"), true, None);
+    let online = CheckMenuItem::new(t("presence.online"), true, true, None);
+    let away = CheckMenuItem::new(t("presence.away"), true, false, None);
+    let deep = Submenu::new(t("deep.title"), true);
+    let mut commands: Vec<(tray_icon::menu::MenuId, TrayCommand)> = vec![];
+    for (key, mins) in [("deep.30m", 30i64), ("deep.1h", 60), ("deep.2h", 120), ("deep.tomorrow", -1)] {
+        let item = MenuItem::new(t(key), true, None);
+        commands.push((item.id().clone(), TrayCommand::DeepWork(mins)));
+        let _ = deep.append(&item);
+    }
+    let deep_end = MenuItem::new(t("deep.end"), false, None);
+    let _ = deep.append(&PredefinedMenuItem::separator());
+    let _ = deep.append(&deep_end);
     let settings = MenuItem::new(t("nav.settings"), true, None);
     let quit = MenuItem::new(t("tray.quit"), true, None);
     let menu = Menu::new();
     let _ = menu.append(&open);
-    let _ = menu.append(&settings);
     let _ = menu.append(&PredefinedMenuItem::separator());
+    let _ = menu.append(&online);
+    let _ = menu.append(&away);
+    let _ = menu.append(&deep);
+    let _ = menu.append(&PredefinedMenuItem::separator());
+    let _ = menu.append(&settings);
     let _ = menu.append(&quit);
 
-    let ids = (open.id().clone(), settings.id().clone(), quit.id().clone());
+    commands.extend([
+        (open.id().clone(), TrayCommand::Show),
+        (online.id().clone(), TrayCommand::Online),
+        (away.id().clone(), TrayCommand::Away),
+        (deep_end.id().clone(), TrayCommand::EndDeepWork),
+        (settings.id().clone(), TrayCommand::Settings),
+        (quit.id().clone(), TrayCommand::Quit),
+    ]);
     let tx_menu = tx.clone();
     MenuEvent::set_event_handler(Some(move |e: MenuEvent| {
-        let cmd = if e.id == ids.0 {
-            TrayCommand::Show
-        } else if e.id == ids.1 {
-            TrayCommand::Settings
-        } else if e.id == ids.2 {
-            TrayCommand::Quit
-        } else {
-            return;
-        };
-        let _ = tx_menu.send(cmd);
+        if let Some((_, cmd)) = commands.iter().find(|(id, _)| *id == e.id) {
+            let _ = tx_menu.send(*cmd);
+        }
     }));
+    let status = StatusItems { online, away, deep, deep_end, shown: Cell::new(None) };
     TrayIconEvent::set_event_handler(Some(move |e: TrayIconEvent| match e {
         TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } | TrayIconEvent::DoubleClick { button: MouseButton::Left, .. } => {
             let _ = tx.send(TrayCommand::Show);
@@ -106,7 +142,7 @@ pub fn install(cx: &mut App) -> Option<tokio::sync::mpsc::UnboundedReceiver<Tray
         .build()
         .map_err(|e| tracing::warn!("tray icon: {e}"))
         .ok()?;
-    cx.set_global(Tray { icon: tray, base, shown: Cell::new(Some(0)) });
+    cx.set_global(Tray { icon: tray, status, base, shown: Cell::new(Some(0)) });
     Some(rx)
 }
 
@@ -131,6 +167,38 @@ pub fn set_unread(n: i64, cx: &App) {
         let tip = if n > 0 { format!("Purlay · {}", crate::i18n::tf("tray.unread", &[&n])) } else { "Purlay".to_string() };
         let _ = tray.icon.set_tooltip(Some(tip));
     }
+}
+
+/// Ticks the status the person is in (online or away) and names Deep Work's end.
+pub fn set_status(away: bool, deep_until: Option<i64>, cx: &App) {
+    let Some(tray) = cx.try_global::<Tray>() else { return };
+    #[cfg(windows)]
+    {
+        let st = &tray.status;
+        if st.shown.get() == Some((away, deep_until)) {
+            return;
+        }
+        st.shown.set(Some((away, deep_until)));
+        st.online.set_checked(!away);
+        st.away.set_checked(away);
+        st.deep_end.set_enabled(deep_until.is_some());
+        st.deep.set_text(match deep_until {
+            Some(u) => format!("{} · {}", t("deep.title"), crate::sidebar::mute_end_text(u)),
+            None => t("deep.title").to_string(),
+        });
+    }
+    #[cfg(not(windows))]
+    let _ = (tray, away, deep_until);
+}
+
+/// The workspace the person last used on this server (Deep Work is per workspace).
+pub fn current_workspace(app: &crate::state::AppModel) -> Option<purlay_core::contract::Uuid> {
+    let s = app.session()?;
+    let prefs = app.prefs.get();
+    let last = prefs.servers.iter().find(|e| Some(&e.address) == prefs.current_server.as_ref()).and_then(|e| e.last_workspace.clone());
+    let store = s.store().read_recursive();
+    let me = store.me.as_ref()?;
+    last.and_then(|w| me.memberships.iter().find(|m| m.workspace.id.as_str() == w).map(|m| m.workspace.id.clone())).or_else(|| me.memberships.first().map(|m| m.workspace.id.clone()))
 }
 
 pub fn installed(cx: &App) -> bool {
@@ -227,8 +295,19 @@ pub fn sync_attention(app: &Entity<crate::state::AppModel>, cx: &mut App) {
     let ready = matches!(model.phase, crate::state::Phase::Ready(_));
     let n = if ready { model.session().map(|s| s.store().read_recursive().attention_count()).unwrap_or(0) } else { 0 };
     let show_badge = !model.prefs.get().hide_taskbar_badge;
+    let (away, deep_until) = match (model.session(), current_workspace(model)) {
+        (Some(s), ws) => {
+            let store = s.store().read_recursive();
+            let away = store.me.as_ref().is_some_and(|m| m.away_chosen);
+            let now = chrono::Local::now().timestamp_millis();
+            let deep = ws.and_then(|w| store.membership(&w).and_then(|m| m.deep_work_until.clone())).and_then(|u| u.unix_ms()).filter(|ms| *ms > now);
+            (away, deep)
+        }
+        _ => (false, None),
+    };
     set_unread(n, cx);
     set_badge(n, show_badge);
+    set_status(away, deep_until, cx);
     let title = if n > 0 { format!("Purlay ({n})") } else { "Purlay".to_string() };
     if let Some(main) = cx.try_global::<crate::banner::MainWindow>().map(|m| m.0) {
         let _ = main.update(cx, |_, w, _| w.set_window_title(&title));
