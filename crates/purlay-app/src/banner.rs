@@ -8,13 +8,15 @@
 use crate::i18n::t;
 use crate::theme::c;
 use crate::ui::*;
+use gpui_kit::component::input::{Input, InputEvent, InputState};
+use gpui_kit::component::Sizable as _;
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use purlay_core::contract::Uuid;
 use std::time::Duration;
 
 const WIDTH: f32 = 380.;
-const HEIGHT: f32 = 100.;
+const HEIGHT: f32 = 104.;
 const GAP: f32 = 10.;
 const MARGIN: f32 = 14.;
 const SLOTS: usize = 3;
@@ -41,6 +43,10 @@ pub struct Banner {
     pub link: String,
     pub channel: Uuid,
     pub message: Uuid,
+    /// The thread the message is in; a reply goes there too.
+    pub thread_root: Option<Uuid>,
+    /// What the reply box says it answers (Reply in #general, Reply to Grace).
+    pub reply_hint: String,
 }
 
 impl Banner {
@@ -56,6 +62,8 @@ impl Banner {
             link: String::new(),
             channel: Uuid::default(),
             message: Uuid::default(),
+            thread_root: None,
+            reply_hint: String::new(),
         }
     }
 }
@@ -156,7 +164,11 @@ struct BannerView {
     hovered: bool,
     left: Duration,
     closing: bool,
+    /// The reply box, while answering from the banner.
+    reply: Option<Entity<InputState>>,
+    sent: bool,
     _timer: Task<()>,
+    _subs: Vec<Subscription>,
 }
 
 impl BannerView {
@@ -166,7 +178,8 @@ impl BannerView {
             cx.background_executor().timer(TICK).await;
             let done = this
                 .update_in(cx, |me, window, cx| {
-                    if !me.hovered {
+                    // Paused while read or answered; a sent reply leaves at once.
+                    if !me.hovered && me.reply.is_none() || me.sent {
                         me.left = me.left.saturating_sub(TICK);
                     }
                     if me.left.is_zero() {
@@ -183,7 +196,7 @@ impl BannerView {
                 break;
             }
         });
-        BannerView { b, id, hovered: false, left: LIFETIME, closing: false, _timer: timer }
+        BannerView { b, id, hovered: false, left: LIFETIME, closing: false, reply: None, sent: false, _timer: timer, _subs: vec![] }
     }
 
     fn close(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -208,6 +221,49 @@ impl BannerView {
             let _ = main.update(cx, |_, w, cx| crate::tray::show_window(w, cx));
         }
         self.close(window, cx);
+    }
+
+    /// Opens the reply box: the banner takes the keyboard (it never does otherwise).
+    fn start_reply(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let hint = self.b.reply_hint.clone();
+        let input = cx.new(|cx| InputState::new(window, cx).placeholder(hint));
+        self._subs.push(cx.subscribe_in(&input, window, |this, _, e: &InputEvent, window, cx| {
+            if matches!(e, InputEvent::PressEnter { .. }) {
+                this.send_reply(window, cx);
+            }
+        }));
+        window.activate_window();
+        input.update(cx, |s, cx| s.focus(window, cx));
+        self.reply = Some(input);
+        cx.notify();
+    }
+
+    fn cancel_reply(&mut self, cx: &mut Context<Self>) {
+        self.reply = None;
+        self._subs.clear();
+        self.left = self.left.max(Duration::from_secs(3));
+        cx.notify();
+    }
+
+    /// Sends the reply where the message was (its thread, or the conversation) and
+    /// counts the message as read.
+    fn send_reply(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(input) = self.reply.clone() else { return };
+        let text = input.read(cx).value().trim().to_string();
+        if text.is_empty() {
+            return;
+        }
+        let app = crate::state::app(cx);
+        let Some(s) = app.read(cx).session().cloned() else { return };
+        drop(s.send_message(&self.b.channel, self.b.thread_root.as_ref(), text, vec![]));
+        if self.b.thread_root.is_none() {
+            s.mark_read(&self.b.channel, &self.b.message);
+        }
+        input.update(cx, |st, cx| st.set_value("", window, cx));
+        self.reply = None;
+        self.sent = true;
+        self.left = Duration::from_millis(1400);
+        cx.notify();
     }
 
     fn mark_read(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -266,40 +322,97 @@ impl Render for BannerView {
                     })),
             );
 
-        let body = h_flex()
-            .items_start()
-            .gap_3()
-            .child(if b.logo { img("purlay/logo.png").size(px(36.)).rounded(px(9.)).into_any_element() } else { avatar(b.avatar_key.clone(), &b.title, 36., cx).into_any_element() })
-            .child(
-                v_flex()
-                    .flex_1()
-                    .min_w_0()
-                    .child(text_style(div(), purlay_tokens::typography::LABEL, cx).text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(k.ink).whitespace_nowrap().overflow_hidden().text_ellipsis().child(b.title.clone()))
-                    .child(text_style(div(), purlay_tokens::typography::LABEL, cx).font_weight(FontWeight::NORMAL).text_color(k.ink_muted).line_clamp(2).child(b.body.clone())),
-            );
+        // On hover the action buttons take the second line.
+        let lines = if self.hovered && !b.link.is_empty() { 1 } else { 2 };
+        let face = if b.logo { img("purlay/logo.png").size(px(36.)).rounded(px(9.)).into_any_element() } else { avatar(b.avatar_key.clone(), &b.title, 36., cx).into_any_element() };
+        let body: AnyElement = if self.sent {
+            // Sent: a short confirmation, then the banner leaves.
+            h_flex()
+                .gap_2()
+                .pt_2()
+                .child(div().size(px(22.)).rounded_full().bg(k.success).flex().items_center().justify_center().child(ico("check", 13., k.on_status)))
+                .child(text_style(div(), purlay_tokens::typography::LABEL, cx).text_color(k.ink).child(t("banner.sent")))
+                .into_any_element()
+        } else if let Some(input) = &self.reply {
+            // Answering: the message on one line, the box under it.
+            v_flex()
+                .gap(px(6.))
+                .child(
+                    h_flex()
+                        .gap_1()
+                        .min_w_0()
+                        .child(text_style(div(), purlay_tokens::typography::CAPTION, cx).font_weight(FontWeight::SEMIBOLD).text_color(k.ink).whitespace_nowrap().child(format!("{}:", b.title)))
+                        .child(text_style(div(), purlay_tokens::typography::CAPTION, cx).text_color(k.ink_muted).whitespace_nowrap().overflow_hidden().text_ellipsis().child(b.body.clone())),
+                )
+                .child(
+                    h_flex()
+                        .gap_2()
+                        .child(div().flex_1().min_w_0().child(Input::new(input).small()))
+                        .child(
+                            div()
+                                .id("banner-send")
+                                .flex_none()
+                                .size(px(28.))
+                                .rounded_full()
+                                .bg(k.accent)
+                                .flex()
+                                .items_center()
+                                .justify_center()
+                                .cursor_pointer()
+                                .hover(move |s| s.bg(k.accent_hover))
+                                .child(ico("arrow-up", 15., k.on_accent))
+                                .on_click(cx.listener(|this, _, window, cx| {
+                                    cx.stop_propagation();
+                                    this.send_reply(window, cx);
+                                })),
+                        ),
+                )
+                .into_any_element()
+        } else {
+            h_flex()
+                .items_start()
+                .gap_3()
+                .child(face)
+                .child(
+                    v_flex()
+                        .flex_1()
+                        .min_w_0()
+                        .child(text_style(div(), purlay_tokens::typography::LABEL, cx).text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(k.ink).whitespace_nowrap().overflow_hidden().text_ellipsis().child(b.title.clone()))
+                        .child(text_style(div(), purlay_tokens::typography::LABEL, cx).font_weight(FontWeight::NORMAL).text_color(k.ink_muted).line_clamp(lines).child(b.body.clone())),
+                )
+                .into_any_element()
+        };
 
-        let mark = div()
-            .id("banner-read")
-            .absolute()
-            .right(px(10.))
-            .bottom(px(8.))
-            .px_2()
-            .h(px(24.))
-            .rounded_full()
-            .flex()
-            .items_center()
-            .bg(bg)
-            .border_1()
-            .border_color(k.border_subtle)
-            .invisible()
-            .group_hover("banner", |s| s.visible())
-            .hover(move |s| s.bg(hover_btn))
-            .child(text_style(div(), purlay_tokens::typography::CAPTION, cx).text_color(k.ink).font_weight(FontWeight::MEDIUM).child(t("banner.markRead")))
-            .on_click(cx.listener(|this, _, window, cx| {
-                cx.stop_propagation();
-                this.mark_read(window, cx);
-            }));
-
+        // Reply and Mark as read, on hover (not on the sample, not while answering).
+        let pill = |id: &'static str, label_key: &'static str, primary: bool| {
+            div()
+                .id(id)
+                .px(px(10.))
+                .h(px(24.))
+                .rounded_full()
+                .flex()
+                .items_center()
+                .when(primary, |d| d.bg(k.accent).hover(move |s| s.bg(k.accent_hover)))
+                .when(!primary, |d| d.bg(bg).border_1().border_color(k.border_subtle).hover(move |s| s.bg(hover_btn)))
+                .child(text_style(div(), purlay_tokens::typography::CAPTION, cx).font_weight(FontWeight::MEDIUM).text_color(if primary { k.on_accent } else { k.ink }).child(t(label_key)))
+        };
+        let actions = (!b.link.is_empty() && self.reply.is_none() && !self.sent).then(|| {
+            h_flex()
+                .absolute()
+                .right(px(10.))
+                .bottom(px(8.))
+                .gap(px(6.))
+                .invisible()
+                .group_hover("banner", |s| s.visible())
+                .child(pill("banner-read", "banner.markRead", false).on_click(cx.listener(|this, _, window, cx| {
+                    cx.stop_propagation();
+                    this.mark_read(window, cx);
+                })))
+                .child(pill("banner-reply", "banner.reply", true).on_click(cx.listener(|this, _, window, cx| {
+                    cx.stop_propagation();
+                    this.start_reply(window, cx);
+                })))
+        });
         div()
             .id("banner")
             .group("banner")
@@ -316,7 +429,17 @@ impl Render for BannerView {
                 this.hovered = *h;
                 cx.notify();
             }))
-            .on_click(cx.listener(|this, _, window, cx| this.open(window, cx)))
+            .on_key_down(cx.listener(|this, e: &KeyDownEvent, _, cx| {
+                if e.keystroke.key == "escape" && this.reply.is_some() {
+                    this.cancel_reply(cx);
+                }
+            }))
+            .on_click(cx.listener(|this, _, window, cx| {
+                // While answering, a click on the banner does not open the conversation.
+                if this.reply.is_none() && !this.sent {
+                    this.open(window, cx);
+                }
+            }))
             .child(
                 v_flex()
                     .size_full()
@@ -329,6 +452,6 @@ impl Render for BannerView {
                         el.ml(px(28. * (1. - d))).opacity(d)
                     }),
             )
-            .child(mark)
+            .children(actions)
     }
 }

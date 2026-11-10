@@ -383,7 +383,16 @@ impl AppModel {
             if purlay_platform::busy() || (!prefs.notify_during_dnd && purlay_platform::do_not_disturb()) {
                 return;
             }
+            let reply_hint = if dm {
+                tf("banner.replyTo", &[&sender])
+            } else if m.parent_id.is_some() {
+                t("banner.replyThread").to_string()
+            } else {
+                tf("banner.replyIn", &[&place])
+            };
             let banner = crate::banner::Banner {
+                reply_hint,
+                thread_root: m.parent_id.clone(),
                 title: sender,
                 avatar_key,
                 place,
