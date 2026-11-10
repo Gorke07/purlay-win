@@ -96,3 +96,13 @@ pub fn flash_window(hwnd: isize, on: bool) {
         let _ = FlashWindowEx(&info);
     }
 }
+
+/// Windows says now is not a time to interrupt: a full-screen game or video, a
+/// presentation, or quiet hours. Purlay's own banners and sounds wait like toasts do.
+pub fn busy() -> bool {
+    use windows::Win32::UI::Shell::{SHQueryUserNotificationState, QUNS_ACCEPTS_NOTIFICATIONS, QUNS_APP, QUNS_NOT_PRESENT};
+    match unsafe { SHQueryUserNotificationState() } {
+        Ok(s) => !(s == QUNS_ACCEPTS_NOTIFICATIONS || s == QUNS_APP || s == QUNS_NOT_PRESENT),
+        Err(_) => false,
+    }
+}

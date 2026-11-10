@@ -325,14 +325,14 @@ impl AppModel {
                 }
             }
             EngineEvent::LostUnsent(n) => cx.emit(AppEvent::Notice(tf("conn.lost", &[&n]))),
-            EngineEvent::Arrived(m) => self.maybe_notify(&m),
+            EngineEvent::Arrived(m) => self.maybe_notify(&m, cx),
             EngineEvent::ChannelGone(..) => {}
             EngineEvent::LoadFailed(what, why) => tracing::debug!("load failed {what}: {why}"),
         }
     }
 
     /// A desktop notification for what the badge counts, only while the window is not in front.
-    fn maybe_notify(&self, m: &Message) {
+    fn maybe_notify(&self, m: &Message, cx: &mut Context<Self>) {
         let Some(s) = self.session() else { return };
         if self.window_active || !self.prefs.get().notifications_enabled {
             return;
@@ -368,7 +368,31 @@ impl AppModel {
         let body = purlay_core::markdown::excerpt_of(&m.content);
         let link = format!("purlay://open?channel={}&message={}", m.channel_id, m.id);
         let prefs = self.prefs.get();
+        let avatar_key = m.sender.as_ref().map(|u| u.username.clone()).unwrap_or_else(|| sender.clone());
+        let place = if dm { t("banner.dm").to_string() } else { format!("#{}", ch.name.clone().unwrap_or_default()) };
         drop(store);
+        if prefs.notification_style == purlay_core::prefs::NotificationStyle::Purlay {
+            // A full-screen game, a presentation or quiet hours: nothing pops up or sounds.
+            if purlay_platform::busy() {
+                return;
+            }
+            let banner = crate::banner::Banner {
+                title: sender,
+                avatar_key,
+                place,
+                body,
+                mention: mentioned && !dm,
+                logo: false,
+                link,
+                channel: m.channel_id.clone(),
+                message: m.id.clone(),
+            };
+            cx.defer(move |cx| crate::banner::show(banner, cx));
+            if prefs.notification_sound {
+                play_tone(prefs.notification_tone);
+            }
+            return;
+        }
         // Purlay's own tone plays beside a silent toast; "Windows default" lets the toast sound.
         let system = prefs.notification_sound && prefs.notification_tone == purlay_core::prefs::NotificationTone::System;
         purlay_platform::toast(&title, &body, Some(&link), !system);

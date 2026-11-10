@@ -42,6 +42,15 @@ pub enum Density {
     Compact,
 }
 
+/// How a notification looks: Purlay's own banner, or a Windows toast.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum NotificationStyle {
+    #[default]
+    Purlay,
+    Windows,
+}
+
 /// The sound a notification makes: one of Purlay's tones, or Windows' own.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -68,6 +77,7 @@ pub struct Data {
     pub notifications_enabled: bool,
     pub notification_sound: bool,
     pub notification_tone: NotificationTone,
+    pub notification_style: NotificationStyle,
     /// Closing the window quits instead of leaving Purlay in the notification area.
     pub quit_on_close: bool,
     /// The one-time still running notice was shown.

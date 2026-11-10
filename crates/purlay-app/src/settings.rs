@@ -1,6 +1,7 @@
 //! Settings (UX §12): device settings here; account, workspace and server writes open
 //! the web UI, where the person may need to sign in separately.
 
+use purlay_core::prefs::NotificationStyle;
 use crate::actions::SHORTCUTS;
 use crate::i18n::{t, tf};
 use crate::nav::Nav;
@@ -200,6 +201,30 @@ impl Render for SettingsPage {
                         p1.update(|d| d.notifications_enabled = *on);
                         cx.refresh_windows();
                     }).into_any_element(), cx))
+                    .child(row(
+                        t("settings.notify.style"),
+                        None,
+                        choice(
+                            "notify-style",
+                            &[(NotificationStyle::Purlay, "settings.notify.style.purlay"), (NotificationStyle::Windows, "settings.notify.style.windows")],
+                            prefs.notification_style,
+                            {
+                                let p = p3.clone();
+                                move |v, _, cx| {
+                                    p.update(|d| d.notification_style = v);
+                                    // A sample, so the choice can be seen at once.
+                                    if v == NotificationStyle::Purlay {
+                                        crate::banner::show(crate::banner::Banner::sample(), cx);
+                                    } else {
+                                        purlay_platform::toast("Purlay", crate::i18n::t("settings.notify.sample"), None, true);
+                                    }
+                                    cx.refresh_windows();
+                                }
+                            },
+                            cx,
+                        ),
+                        cx,
+                    ))
                     .child(row(t("settings.notify.sound"), None, Switch::new("sound").checked(prefs.notification_sound).on_change(move |on, _, cx| {
                         p2.update(|d| d.notification_sound = *on);
                         cx.refresh_windows();

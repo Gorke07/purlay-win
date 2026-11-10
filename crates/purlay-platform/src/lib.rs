@@ -31,6 +31,9 @@ mod other {
     }
     pub fn toast(_title: &str, _body: &str, _launch: Option<&str>, _silent: bool) {}
     pub fn flash_window(_hwnd: isize, _on: bool) {}
+    pub fn busy() -> bool {
+        false
+    }
 }
 #[cfg(not(windows))]
 pub use other::*;

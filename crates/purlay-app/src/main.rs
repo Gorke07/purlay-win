@@ -3,6 +3,7 @@
 
 mod actions;
 mod assets;
+mod banner;
 mod chrome;
 mod composer;
 mod conversation;
@@ -134,6 +135,7 @@ fn main() {
             cx.new(|cx| root::RootView::new(window, cx))
         })
         .expect("open window");
+        cx.set_global(banner::MainWindow(window));
 
         // The tray: a click shows the window, the menu opens settings or quits.
         if let Some(mut commands) = tray::install(cx) {
