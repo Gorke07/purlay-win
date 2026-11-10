@@ -18,7 +18,7 @@ const ICONS: &[(&str, &[u8])] = icons![
     "arrow-down", "wifi-off", "refresh-cw", "square-pen", "circle-help", "lightbulb", "flag", "siren",
     "git-pull-request", "bug", "house", "sticker", "file-text", "external-link", "copy", "more-horizontal", "sun-moon",
     "keyboard", "settings", "folder-plus", "star", "bell", "chevrons-up-down", "panel-left", "panel-right", "arrow-up",
-    "moon", "sun", "list-filter", "gallery-vertical-end", "win-min", "win-max", "win-restore", "win-close",
+    "moon", "sun", "list-filter", "gallery-vertical-end", "win-min", "win-max", "win-restore", "win-close", "volume-2", "play", "check",
 ];
 
 pub const LOGO_PNG: &[u8] = include_bytes!("../assets/purlay-logo-128.png");

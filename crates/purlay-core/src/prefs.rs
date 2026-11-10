@@ -42,6 +42,19 @@ pub enum Density {
     Compact,
 }
 
+/// The sound a notification makes: one of Purlay's tones, or Windows' own.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum NotificationTone {
+    #[default]
+    Drop,
+    Chime,
+    Marimba,
+    Glass,
+    /// The toast's own sound, as set in Windows.
+    System,
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Data {
@@ -54,6 +67,7 @@ pub struct Data {
     pub launch_at_login: bool,
     pub notifications_enabled: bool,
     pub notification_sound: bool,
+    pub notification_tone: NotificationTone,
     /// key → text
     pub drafts: BTreeMap<String, String>,
     /// `<server>|<user>|<workspace>` → newest first
@@ -87,7 +101,7 @@ impl Prefs {
             .as_ref()
             .and_then(|p| std::fs::read_to_string(p).ok())
             .and_then(|t| serde_json::from_str::<Data>(&t).ok())
-            .unwrap_or_else(|| Data { notifications_enabled: true, ..Default::default() });
+            .unwrap_or_else(|| Data { notifications_enabled: true, notification_sound: true, ..Default::default() });
         Prefs { path, data: Arc::new(Mutex::new(data)) }
     }
 

@@ -181,6 +181,7 @@ impl Render for SettingsPage {
             }
             Section::Notifications => {
                 let p2 = p1.clone();
+                let p3 = p1.clone();
                 v_flex()
                     .child(div().py_2().child(muted(t("settings.notify.body"), cx)))
                     .child(row(t("settings.notify.enabled"), None, Switch::new("notify").checked(prefs.notifications_enabled).on_change(move |on, _, cx| {
@@ -191,6 +192,7 @@ impl Render for SettingsPage {
                         p2.update(|d| d.notification_sound = *on);
                         cx.refresh_windows();
                     }).into_any_element(), cx))
+                    .when(prefs.notification_sound, |d| d.child(tone_picker(p3, prefs.notification_tone, cx)))
                     .into_any_element()
             }
             Section::Account => {
@@ -303,4 +305,73 @@ impl Render for SettingsPage {
             )
             .into_any_element()
     }
+}
+
+/// The notification sounds as a list: a row is chosen and heard with one click; the
+/// speaker button replays it without choosing.
+fn tone_picker(prefs: purlay_core::prefs::Prefs, current: purlay_core::prefs::NotificationTone, cx: &App) -> AnyElement {
+    use purlay_core::prefs::NotificationTone as N;
+    let k = c(cx);
+    let items = [
+        (N::Drop, "tone.drop", "tone.drop.desc"),
+        (N::Chime, "tone.chime", "tone.chime.desc"),
+        (N::Marimba, "tone.marimba", "tone.marimba.desc"),
+        (N::Glass, "tone.glass", "tone.glass.desc"),
+        (N::System, "tone.system", "tone.system.desc"),
+    ];
+    let hover = k.surface_050;
+    let mut list = v_flex().gap_1();
+    for (i, (tone, name, desc)) in items.into_iter().enumerate() {
+        let sel = tone == current;
+        let p = prefs.clone();
+        list = list.child(
+            h_flex()
+                .id(("tone", i))
+                .px_3()
+                .py_2()
+                .gap_3()
+                .rounded(px(purlay_tokens::radius::XL))
+                .border_1()
+                .border_color(if sel { k.accent } else { k.border_subtle })
+                .when(sel, |d| d.bg(k.accent.opacity(0.08)))
+                .when(!sel, |d| d.hover(move |s| s.bg(hover)))
+                .cursor_pointer()
+                .child(
+                    div()
+                        .size(px(32.))
+                        .flex_none()
+                        .rounded_full()
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .bg(if sel { k.accent } else { k.surface_200 })
+                        .child(ico(if sel { "check" } else { "volume-2" }, 16., if sel { k.on_accent } else { k.ink_muted })),
+                )
+                .child(
+                    v_flex()
+                        .flex_1()
+                        .min_w_0()
+                        .child(text_style(div(), purlay_tokens::typography::LABEL, cx).text_color(k.ink).font_weight(FontWeight::SEMIBOLD).child(t(name)))
+                        .child(caption(t(desc), cx)),
+                )
+                .child(
+                    icon_button(("tone-play", i), "play", "settings.notify.toneHint", cx).on_click(move |_, _, cx| {
+                        cx.stop_propagation();
+                        crate::state::play_tone(tone);
+                    }),
+                )
+                .on_click(move |_, _, cx| {
+                    p.update(|d| d.notification_tone = tone);
+                    crate::state::play_tone(tone);
+                    cx.refresh_windows();
+                }),
+        );
+    }
+    v_flex()
+        .py_3()
+        .gap_2()
+        .child(text_style(div(), purlay_tokens::typography::LABEL, cx).text_color(k.ink).child(t("settings.notify.tone")))
+        .child(caption(t("settings.notify.toneHint"), cx))
+        .child(list)
+        .into_any_element()
 }

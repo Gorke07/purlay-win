@@ -365,9 +365,14 @@ impl AppModel {
         };
         let body = purlay_core::markdown::excerpt_of(&m.content);
         let link = format!("purlay://open?channel={}&message={}", m.channel_id, m.id);
-        let silent = !self.prefs.get().notification_sound;
+        let prefs = self.prefs.get();
         drop(store);
-        purlay_platform::toast(&title, &body, Some(&link), silent);
+        // Purlay's own tone plays beside a silent toast; "Windows default" lets the toast sound.
+        let system = prefs.notification_sound && prefs.notification_tone == purlay_core::prefs::NotificationTone::System;
+        purlay_platform::toast(&title, &body, Some(&link), !system);
+        if prefs.notification_sound && !system {
+            play_tone(prefs.notification_tone);
+        }
     }
 
     pub fn sign_out(&mut self, everywhere: bool, cx: &mut Context<Self>) {
@@ -423,4 +428,17 @@ pub fn link_target(raw: &str) -> Option<(Option<String>, Uuid, Option<Uuid>)> {
     let w = segs.iter().position(|s| *s == "w").and_then(|i| segs.get(i + 1)).map(|s| s.to_string());
     let c = segs.iter().position(|s| *s == "c").and_then(|i| segs.get(i + 1))?;
     Some((w, Uuid::new(*c), q("message").map(Uuid::new)))
+}
+
+/// Plays a notification tone now: one of Purlay's, or Windows' own.
+pub fn play_tone(tone: purlay_core::prefs::NotificationTone) {
+    use purlay_core::prefs::NotificationTone as N;
+    use purlay_platform::sound::{self, Tone};
+    match tone {
+        N::Drop => sound::play(Tone::Drop),
+        N::Chime => sound::play(Tone::Chime),
+        N::Marimba => sound::play(Tone::Marimba),
+        N::Glass => sound::play(Tone::Glass),
+        N::System => sound::play_system(),
+    }
 }

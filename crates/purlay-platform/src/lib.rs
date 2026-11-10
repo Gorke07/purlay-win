@@ -9,6 +9,7 @@
 //! - **Toasts, the taskbar and launch at login.**
 
 pub mod instance;
+pub mod sound;
 
 #[cfg(windows)]
 mod win;
