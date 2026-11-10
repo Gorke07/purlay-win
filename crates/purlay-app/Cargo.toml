@@ -1,0 +1,34 @@
+[package]
+name = "purlay-app"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Purlay for Windows: a native client for the Purlay team chat server"
+
+[[bin]]
+name = "purlay"
+path = "src/main.rs"
+
+[dependencies]
+gpui-kit.workspace = true
+purlay-contract.workspace = true
+purlay-tokens.workspace = true
+purlay-core.workspace = true
+purlay-platform.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+tokio.workspace = true
+futures.workspace = true
+url.workspace = true
+parking_lot.workspace = true
+directories.workspace = true
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+
+[build-dependencies]
+winresource = "0.1"
+
+[lints]
+workspace = true
