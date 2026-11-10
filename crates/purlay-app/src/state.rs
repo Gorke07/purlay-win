@@ -378,8 +378,9 @@ impl AppModel {
         let place = if dm { t("banner.dm").to_string() } else { format!("#{}", ch.name.clone().unwrap_or_default()) };
         drop(store);
         if prefs.notification_style == purlay_core::prefs::NotificationStyle::Purlay {
-            // A full-screen game, a presentation or quiet hours: nothing pops up or sounds.
-            if purlay_platform::busy() {
+            // A full-screen game, a presentation, quiet hours, or Windows' Do Not Disturb
+            // (unless Settings say otherwise): nothing pops up or sounds. The inbox keeps it.
+            if purlay_platform::busy() || (!prefs.notify_during_dnd && purlay_platform::do_not_disturb()) {
                 return;
             }
             let banner = crate::banner::Banner {

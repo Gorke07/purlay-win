@@ -106,3 +106,25 @@ pub fn busy() -> bool {
         Err(_) => false,
     }
 }
+
+/// Windows 11's Do Not Disturb (or Focus) is on: the shell's quiet-hours profile is
+/// "priority only" (1) or "alarms only" (2). Windows publishes it only as a WNF state, which
+/// `ntdll` reads; the registry values often suggested for this do not change with it.
+pub fn do_not_disturb() -> bool {
+    use windows::core::{s, w};
+    use windows::Win32::System::LibraryLoader::{GetModuleHandleW, GetProcAddress};
+    // WNF_SHEL_QUIETHOURS_ACTIVE_PROFILE_CHANGED
+    const STATE: u64 = 0x0D83_063E_A3BF_1C75;
+    type Query = unsafe extern "system" fn(*const u64, *const core::ffi::c_void, *const core::ffi::c_void, *mut u32, *mut core::ffi::c_void, *mut u32) -> i32;
+    unsafe {
+        let Ok(ntdll) = GetModuleHandleW(w!("ntdll.dll")) else { return false };
+        let Some(f) = GetProcAddress(ntdll, s!("NtQueryWnfStateData")) else { return false };
+        let query: Query = std::mem::transmute(f);
+        let name = STATE;
+        let mut stamp = 0u32;
+        let mut value = 0u32;
+        let mut size = std::mem::size_of::<u32>() as u32;
+        let status = query(&name, std::ptr::null(), std::ptr::null(), &mut stamp, &mut value as *mut u32 as *mut _, &mut size);
+        status >= 0 && size >= 4 && (value == 1 || value == 2)
+    }
+}

@@ -35,6 +35,9 @@ mod other {
     pub fn busy() -> bool {
         false
     }
+    pub fn do_not_disturb() -> bool {
+        false
+    }
 }
 #[cfg(not(windows))]
 pub use other::*;

@@ -262,6 +262,8 @@ pub const STRINGS: &[(&str, &str, &str)] = &[
     ("settings.notify.style", "Notification style", "Bildirim görünümü"),
     ("settings.notify.style.purlay", "Purlay", "Purlay"),
     ("settings.notify.style.windows", "Windows", "Windows"),
+    ("settings.notify.dnd", "Follow Windows' Do Not Disturb", "Windows'un Rahatsız Etmeyin moduna uy"),
+    ("settings.notify.dndHint", "While it is on, no banners or sounds; everything waits in the Inbox.", "Açıkken bildirim kartı ve ses gelmez; hepsi Gelen kutusunda bekler."),
     ("settings.notify.badge", "Show the count on the taskbar button", "Görev çubuğu düğmesinde sayıyı göster"),
     ("settings.notify.sample", "This is how notifications will look.", "Bildirimler böyle görünecek."),
     ("tray.open", "Open Purlay", "Purlay'i aç"),

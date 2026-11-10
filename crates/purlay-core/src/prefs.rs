@@ -80,6 +80,8 @@ pub struct Data {
     pub notification_style: NotificationStyle,
     /// No count on the taskbar button.
     pub hide_taskbar_badge: bool,
+    /// Banners and sounds come even while Windows' Do Not Disturb is on.
+    pub notify_during_dnd: bool,
     /// `<server>|<channel>` → a mute that ends by itself (kept here until the server can
     /// hold the end time, doancan/purlay#1379).
     pub timed_mutes: BTreeMap<String, TimedMute>,

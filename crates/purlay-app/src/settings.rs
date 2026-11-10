@@ -225,6 +225,20 @@ impl Render for SettingsPage {
                         ),
                         cx,
                     ))
+                    .when(prefs.notification_style == NotificationStyle::Purlay, |d| {
+                        d.child(row(
+                            t("settings.notify.dnd"),
+                            Some(t("settings.notify.dndHint").to_string()),
+                            Switch::new("respect-dnd").checked(!prefs.notify_during_dnd).on_change({
+                                let p = p3.clone();
+                                move |on, _, cx| {
+                                    p.update(|d| d.notify_during_dnd = !*on);
+                                    cx.refresh_windows();
+                                }
+                            }).into_any_element(),
+                            cx,
+                        ))
+                    })
                     .child(row(
                         t("settings.notify.badge"),
                         None,
