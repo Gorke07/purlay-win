@@ -298,4 +298,22 @@ impl Nav {
             self.open_channel(&c, cx);
         }
     }
+
+    /// Alt+↑/↓: the channel above or below in the sidebar, wrapping around.
+    pub fn step_channel(&mut self, forward: bool, cx: &mut Context<Self>) {
+        let list = self.ordered_channels(cx);
+        if list.is_empty() {
+            return;
+        }
+        let n = list.len();
+        let pos = self.current_channel().and_then(|c| list.iter().position(|x| x.id == *c));
+        let next = match (pos, forward) {
+            (Some(p), true) => (p + 1) % n,
+            (Some(p), false) => (p + n - 1) % n,
+            (None, true) => 0,
+            (None, false) => n - 1,
+        };
+        let id = list[next].id.clone();
+        self.open_channel(&id, cx);
+    }
 }

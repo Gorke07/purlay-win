@@ -154,6 +154,28 @@ impl ConversationView {
         me
     }
 
+    /// Ctrl+J: brings the first unread message (the "New" line) into view.
+    pub fn jump_to_unread(&mut self, cx: &mut Context<Self>) {
+        if let Some(ix) = self.rows.iter().position(|r| *r == Row::NewMarker) {
+            self.list.set_follow_mode(FollowMode::Normal);
+            self.list.scroll_to_reveal_item(ix);
+            cx.notify();
+        }
+    }
+
+    /// Esc: the channel is read up to its newest message, and the "New" line goes.
+    pub fn mark_read_now(&mut self, cx: &mut Context<Self>) {
+        let newest = self.session.store().read_recursive().windows.get(&self.channel).filter(|w| w.reaches_newest).and_then(|w| w.newest_id().cloned());
+        if let Some(n) = newest {
+            self.last_marked = Some(n.clone());
+            self.session.mark_read(&self.channel, &n);
+        }
+        if self.marker_after.take().is_some() {
+            self.last_rev = u64::MAX;
+            self.refresh(cx);
+        }
+    }
+
     pub fn focus_composer(&self, window: &mut Window, cx: &mut Context<Self>) {
         self.composer.update(cx, |c, cx| c.focus(window, cx));
     }

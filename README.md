@@ -18,7 +18,8 @@ connects to your server; it does not host one.
 | **Reactions** from a searchable emoji picker (English and Turkish), with recents. | **Saved messages** (In Progress / Completed / Archived), **drafts** per channel and thread. |
 | **Files**: pick, paste or drop to upload; images inline, files saved where you choose. | **Open Topics**: unresolved threads across the workspace. |
 | **Markdown** exactly as the server reads it: code blocks, lists, tables, links, `@mentions`. | **Search** across messages, with question, code and file filters, and other modules' hits. |
-| **Issues**, **scheduled messages** and **reminders** when the server offers them. | **Desktop notifications** for DMs and mentions while the window is in the background. |
+| **Issues**, **scheduled messages** and **reminders** when the server offers them. | **Notifications** in Purlay's own banners (or Windows toasts): reply or mark read from the banner, four sounds to choose from, and quiet during Windows' Do Not Disturb, full-screen apps and presentations. |
+| **Mute** a channel or conversation for 15 minutes up to a day; it comes back by itself. | **Notification area**: Purlay keeps running when closed; set Online, Away or Deep Work from the tray; the taskbar button shows how many messages wait. |
 
 Also: optimistic sends with a durable outbox (a message written while offline is sent when the connection is back,
 and survives a restart), live presence and typing, link previews, edit history, permalinks
@@ -44,12 +45,15 @@ sign-in back to the app.
 | Open Inbox | `Ctrl Shift I` |
 | Toggle Deep Work | `Ctrl Shift D` |
 | New conversation | `Ctrl N` |
-| Next / previous unread channel | `Alt ↓` / `Alt ↑` |
+| Next / previous channel | `Alt ↓` / `Alt ↑` |
+| Next / previous unread channel | `Alt Shift ↓` / `Alt Shift ↑` |
+| Jump to the first unread message | `Ctrl J` or `Shift Page Up` |
+| Mark the channel read (when no panel is open) | `Esc` |
 | Mark everything read | `Shift Esc` |
 | Focus the message box | `Ctrl L` |
 | Edit your last message | `↑` in an empty message box |
 | Send (always) | `Ctrl Enter` |
-| Show all shortcuts | `Ctrl /` |
+| Show all shortcuts | `Ctrl /` or `Ctrl .` |
 
 ## Build
 

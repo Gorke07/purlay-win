@@ -537,6 +537,13 @@ impl Render for MainView {
             .on_action(cx.listener(|this, _: &OpenSettings, _, cx| this.nav.update(cx, |n, cx| n.go(Route::Settings, cx))))
             .on_action(cx.listener(|this, _: &GoBack, _, cx| this.nav.update(cx, |n, cx| n.go_back(cx))))
             .on_action(cx.listener(|this, _: &NextUnread, _, cx| this.nav.update(cx, |n, cx| n.step_unread(true, cx))))
+            .on_action(cx.listener(|this, _: &NextChannel, _, cx| this.nav.update(cx, |n, cx| n.step_channel(true, cx))))
+            .on_action(cx.listener(|this, _: &PrevChannel, _, cx| this.nav.update(cx, |n, cx| n.step_channel(false, cx))))
+            .on_action(cx.listener(|this, _: &JumpToUnread, _, cx| {
+                if let Some(v) = this.nav.read(cx).current_channel().and_then(|c| this.conversations.get(c)).cloned() {
+                    v.update(cx, |v, cx| v.jump_to_unread(cx));
+                }
+            }))
             .on_action(cx.listener(|this, _: &PrevUnread, _, cx| this.nav.update(cx, |n, cx| n.step_unread(false, cx))))
             .on_action(cx.listener(|this, _: &ShowShortcuts, _, cx| {
                 this.nav.update(cx, |n, cx| {
@@ -546,6 +553,7 @@ impl Render for MainView {
             }))
             .on_action(cx.listener(|this, _: &NewConversation, window, cx| crate::dialogs::new_conversation(this.app.clone(), this.nav.clone(), window, cx)))
             .on_action(cx.listener(|this, _: &CloseInspector, _, cx| {
+                let had_overlay = { let n = this.nav.read(cx); n.palette || n.shortcuts || n.inspector.is_some() };
                 this.nav.update(cx, |n, cx| {
                     if n.palette || n.shortcuts {
                         n.palette = false;
@@ -554,7 +562,13 @@ impl Render for MainView {
                     } else {
                         n.close_inspector(cx);
                     }
-                })
+                });
+                // Nothing left to close: Esc reads the channel, as in Discord and Slack.
+                if !had_overlay {
+                    if let Some(v) = this.nav.read(cx).current_channel().and_then(|c| this.conversations.get(c)).cloned() {
+                        v.update(cx, |v, cx| v.mark_read_now(cx));
+                    }
+                }
             }))
             .on_action(cx.listener(|this, _: &FocusComposer, window, cx| {
                 if let Some(ch) = this.nav.read(cx).current_channel().cloned() {
