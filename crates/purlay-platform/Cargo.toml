@@ -1,0 +1,25 @@
+[package]
+name = "purlay-platform"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Windows integration: purlay:// protocol, single instance, toasts, taskbar, autostart"
+
+[dependencies]
+tokio = { workspace = true, features = ["net", "io-util", "rt", "sync"] }
+tracing.workspace = true
+anyhow.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+winreg = "0.55"
+tauri-winrt-notification = "0.7"
+windows = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_UI_Shell",
+    "Win32_System_Com",
+    "Win32_Graphics_Gdi",
+] }
+
+[lints]
+workspace = true
