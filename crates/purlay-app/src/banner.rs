@@ -17,6 +17,8 @@ use std::time::Duration;
 
 const WIDTH: f32 = 380.;
 const HEIGHT: f32 = 104.;
+/// A compact banner: one row, no header.
+const COMPACT_HEIGHT: f32 = 72.;
 const GAP: f32 = 10.;
 const MARGIN: f32 = 14.;
 const SLOTS: usize = 3;
@@ -80,7 +82,14 @@ struct Slots {
 impl Global for Slots {}
 
 /// Shows a banner in the lowest free slot (or in place of the oldest when all are taken).
-pub fn show(b: Banner, cx: &mut App) {
+pub fn show(mut b: Banner, cx: &mut App) {
+    let prefs = crate::state::app(cx).read(cx).prefs.get();
+    let compact = prefs.banner_compact;
+    let height = if compact { COMPACT_HEIGHT } else { HEIGHT };
+    // For screen sharing: who and where, not what.
+    if prefs.banner_hide_text && !b.logo {
+        b.body = t("banner.hidden").to_string();
+    }
     if !cx.has_global::<Slots>() {
         cx.set_global(Slots::default());
     }
@@ -100,12 +109,20 @@ pub fn show(b: Banner, cx: &mut App) {
 
     let Some(display) = cx.primary_display() else { return };
     let area = display.visible_bounds();
-    let origin = point(
-        area.origin.x + area.size.width - px(WIDTH + MARGIN),
-        area.origin.y + area.size.height - px((HEIGHT + GAP) * (slot as f32 + 1.) - GAP + MARGIN),
-    );
+    use purlay_core::prefs::BannerCorner as C;
+    let corner = prefs.banner_corner;
+    let x = match corner {
+        C::BottomLeft | C::TopLeft => area.origin.x + px(MARGIN),
+        C::BottomRight | C::TopRight => area.origin.x + area.size.width - px(WIDTH + MARGIN),
+    };
+    // From the bottom the stack grows upwards; from the top, downwards.
+    let y = match corner {
+        C::BottomLeft | C::BottomRight => area.origin.y + area.size.height - px((height + GAP) * (slot as f32 + 1.) - GAP + MARGIN),
+        C::TopLeft | C::TopRight => area.origin.y + px(MARGIN + (height + GAP) * slot as f32),
+    };
+    let origin = point(x, y);
     let options = WindowOptions {
-        window_bounds: Some(WindowBounds::Windowed(Bounds::new(origin, size(px(WIDTH), px(HEIGHT))))),
+        window_bounds: Some(WindowBounds::Windowed(Bounds::new(origin, size(px(WIDTH), px(height))))),
         titlebar: Some(TitlebarOptions { title: None, appears_transparent: true, traffic_light_position: None }),
         focus: false,
         show: true,
@@ -119,7 +136,7 @@ pub fn show(b: Banner, cx: &mut App) {
     };
     let opened = cx.open_window(options, move |window, cx| {
         round_corners(window);
-        cx.new(|cx| BannerView::new(b, id, window, cx))
+        cx.new(|cx| BannerView::new(b, id, compact, window, cx))
     });
     tracing::debug!("banner {id} in slot {slot}");
     match opened {
@@ -161,6 +178,7 @@ fn round_corners(window: &Window) {
 struct BannerView {
     b: Banner,
     id: u64,
+    compact: bool,
     hovered: bool,
     left: Duration,
     closing: bool,
@@ -172,7 +190,7 @@ struct BannerView {
 }
 
 impl BannerView {
-    fn new(b: Banner, id: u64, window: &mut Window, cx: &mut Context<Self>) -> Self {
+    fn new(b: Banner, id: u64, compact: bool, window: &mut Window, cx: &mut Context<Self>) -> Self {
         // Counts down while the pointer is away; a banner being read stays.
         let timer = cx.spawn_in(window, async move |this, cx| loop {
             cx.background_executor().timer(TICK).await;
@@ -196,7 +214,7 @@ impl BannerView {
                 break;
             }
         });
-        BannerView { b, id, hovered: false, left: LIFETIME, closing: false, reply: None, sent: false, _timer: timer, _subs: vec![] }
+        BannerView { b, id, compact, hovered: false, left: LIFETIME, closing: false, reply: None, sent: false, _timer: timer, _subs: vec![] }
     }
 
     fn close(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -299,10 +317,13 @@ impl Render for BannerView {
                 )
             })
             .child(div().flex_1())
-            .child(caption(t("time.now"), cx).group_hover("banner", |s| s.invisible()))
-            .child(
-                // Close: shown on hover, over the time.
-                div()
+            .child(caption(t("time.now"), cx).group_hover("banner", |s| s.invisible()));
+
+        // On hover the action buttons take the second line.
+        let lines = if self.hovered && !b.link.is_empty() { 1 } else { 2 };
+        let face = if b.logo { img("purlay/logo.png").size(px(36.)).rounded(px(9.)).into_any_element() } else { avatar(b.avatar_key.clone(), &b.title, 36., cx).into_any_element() };
+        // Close: shown on hover (over the time in a full banner).
+        let close_btn = div()
                     .id("banner-close")
                     .absolute()
                     .right(px(8.))
@@ -319,12 +340,8 @@ impl Render for BannerView {
                     .on_click(cx.listener(|this, _, window, cx| {
                         cx.stop_propagation();
                         this.close(window, cx);
-                    })),
-            );
+                    }));
 
-        // On hover the action buttons take the second line.
-        let lines = if self.hovered && !b.link.is_empty() { 1 } else { 2 };
-        let face = if b.logo { img("purlay/logo.png").size(px(36.)).rounded(px(9.)).into_any_element() } else { avatar(b.avatar_key.clone(), &b.title, 36., cx).into_any_element() };
         let body: AnyElement = if self.sent {
             // Sent: a short confirmation, then the banner leaves.
             h_flex()
@@ -366,6 +383,26 @@ impl Render for BannerView {
                                     this.send_reply(window, cx);
                                 })),
                         ),
+                )
+                .into_any_element()
+        } else if self.compact {
+            // One row: who and where, then the message on one line.
+            h_flex()
+                .gap(px(10.))
+                .child(if b.logo { img("purlay/logo.png").size(px(32.)).rounded(px(8.)).into_any_element() } else { avatar(b.avatar_key.clone(), &b.title, 32., cx).into_any_element() })
+                .child(
+                    v_flex()
+                        .flex_1()
+                        .min_w_0()
+                        .child(
+                            h_flex()
+                                .gap_1()
+                                .min_w_0()
+                                .child(text_style(div(), purlay_tokens::typography::LABEL, cx).font_weight(FontWeight::SEMIBOLD).text_color(k.ink).whitespace_nowrap().child(b.title.clone()))
+                                .child(text_style(div(), purlay_tokens::typography::CAPTION, cx).text_color(k.ink_muted).whitespace_nowrap().overflow_hidden().text_ellipsis().child(format!("· {}", b.place)))
+                                .when(b.mention, |d| d.child(ico("at-sign", 12., k.accent_text))),
+                        )
+                        .child(text_style(div(), purlay_tokens::typography::CAPTION, cx).text_color(k.ink_muted).whitespace_nowrap().overflow_hidden().text_ellipsis().child(b.body.clone())),
                 )
                 .into_any_element()
         } else {
@@ -444,14 +481,14 @@ impl Render for BannerView {
                 v_flex()
                     .size_full()
                     .px(px(14.))
-                    .pt(px(10.))
-                    .gap(px(8.))
-                    .child(header)
+                    .when(!self.compact, |d| d.pt(px(10.)).gap(px(8.)).child(header))
+                    .when(self.compact, |d| d.justify_center().gap_1())
                     .child(body)
                     .with_animation("banner-in", Animation::new(Duration::from_millis(260)).with_easing(ease_out_quint()), |el, d| {
                         el.ml(px(28. * (1. - d))).opacity(d)
                     }),
             )
             .children(actions)
+            .child(close_btn)
     }
 }

@@ -226,7 +226,53 @@ impl Render for SettingsPage {
                         cx,
                     ))
                     .when(prefs.notification_style == NotificationStyle::Purlay, |d| {
+                        use purlay_core::prefs::BannerCorner as BC;
+                        let sample = |cx: &mut App| crate::banner::show(crate::banner::Banner::sample(), cx);
                         d.child(row(
+                            t("settings.notify.position"),
+                            None,
+                            choice(
+                                "banner-corner",
+                                &[(BC::BottomRight, "settings.notify.corner.br"), (BC::BottomLeft, "settings.notify.corner.bl"), (BC::TopRight, "settings.notify.corner.tr"), (BC::TopLeft, "settings.notify.corner.tl")],
+                                prefs.banner_corner,
+                                {
+                                    let p = p3.clone();
+                                    move |v, _, cx| {
+                                        p.update(|d| d.banner_corner = v);
+                                        sample(cx);
+                                        cx.refresh_windows();
+                                    }
+                                },
+                                cx,
+                            ),
+                            cx,
+                        ))
+                        .child(row(
+                            t("settings.notify.compact"),
+                            None,
+                            Switch::new("banner-compact").checked(prefs.banner_compact).on_change({
+                                let p = p3.clone();
+                                move |on, _, cx| {
+                                    p.update(|d| d.banner_compact = *on);
+                                    sample(cx);
+                                    cx.refresh_windows();
+                                }
+                            }).into_any_element(),
+                            cx,
+                        ))
+                        .child(row(
+                            t("settings.notify.hideText"),
+                            Some(t("settings.notify.hideTextHint").to_string()),
+                            Switch::new("banner-hide-text").checked(prefs.banner_hide_text).on_change({
+                                let p = p3.clone();
+                                move |on, _, cx| {
+                                    p.update(|d| d.banner_hide_text = *on);
+                                    cx.refresh_windows();
+                                }
+                            }).into_any_element(),
+                            cx,
+                        ))
+                        .child(row(
                             t("settings.notify.dnd"),
                             Some(t("settings.notify.dndHint").to_string()),
                             Switch::new("respect-dnd").checked(!prefs.notify_during_dnd).on_change({

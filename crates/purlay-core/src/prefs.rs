@@ -51,6 +51,17 @@ pub enum NotificationStyle {
     Windows,
 }
 
+/// Where Purlay's banners appear on the screen.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum BannerCorner {
+    #[default]
+    BottomRight,
+    BottomLeft,
+    TopRight,
+    TopLeft,
+}
+
 /// The sound a notification makes: one of Purlay's tones, or Windows' own.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -82,6 +93,11 @@ pub struct Data {
     pub hide_taskbar_badge: bool,
     /// Banners and sounds come even while Windows' Do Not Disturb is on.
     pub notify_during_dnd: bool,
+    pub banner_corner: BannerCorner,
+    /// One line per banner instead of two, without the header.
+    pub banner_compact: bool,
+    /// Banners say who wrote and where, but not what (for screen sharing).
+    pub banner_hide_text: bool,
     /// `<server>|<channel>` → a mute that ends by itself (kept here until the server can
     /// hold the end time, doancan/purlay#1379).
     pub timed_mutes: BTreeMap<String, TimedMute>,
