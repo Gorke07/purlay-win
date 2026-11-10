@@ -1,0 +1,33 @@
+[package]
+name = "purlay-devserver"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "An in-memory fake of the Purlay server, speaking the pinned wire contract, for development and integration tests"
+
+[lib]
+name = "purlay_devserver"
+path = "src/lib.rs"
+
+[[bin]]
+name = "purlay-devserver"
+path = "src/main.rs"
+
+[dependencies]
+purlay-contract = { path = "../purlay-contract" }
+axum = { version = "0.8", features = ["ws"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync", "net", "signal"] }
+futures = "0.3"
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+serde_urlencoded = "0.7"
+rand = "0.9"
+parking_lot = "0.12"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+sha2 = "0.10"
+base64 = "0.22"
+
+[dev-dependencies]
+reqwest = { version = "0.12", default-features = false, features = ["json"] }
+tokio-tungstenite = "0.28"
