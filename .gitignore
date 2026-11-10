@@ -1,0 +1,5 @@
+/target
+/Contract/bundle/
+/Contract/download/
+*.pdb
+.env

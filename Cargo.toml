@@ -1,0 +1,68 @@
+[workspace]
+resolver = "2"
+members = [
+    "xtask",
+    "crates/purlay-contract",
+    "crates/purlay-tokens",
+    "crates/purlay-core",
+    "crates/purlay-platform",
+    "crates/purlay-app",
+    "crates/purlay-markdown",
+    "crates/purlay-devserver",
+]
+default-members = ["crates/purlay-app"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-only"
+repository = "https://github.com/doancan/purlay-win"
+authors = ["Purlay for Windows contributors"]
+
+[workspace.dependencies]
+purlay-contract = { path = "crates/purlay-contract" }
+purlay-tokens = { path = "crates/purlay-tokens" }
+purlay-core = { path = "crates/purlay-core" }
+purlay-platform = { path = "crates/purlay-platform" }
+
+gpui-kit = "0.9.1"
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+thiserror = "2"
+anyhow = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync", "fs", "net"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
+tokio-tungstenite = { version = "0.28", features = ["rustls-tls-native-roots"] }
+futures = "0.3"
+url = "2"
+uuid = { version = "1", features = ["v4", "v7"] }
+sha2 = "0.10"
+base64 = "0.22"
+rand = "0.9"
+hex = "0.4"
+time = { version = "0.3", features = ["formatting", "parsing", "macros", "serde"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+semver = "1"
+directories = "6"
+keyring = { version = "3", features = ["windows-native"] }
+parking_lot = "0.12"
+unicode-segmentation = "1"
+
+[workspace.lints.clippy]
+# `ApiError` carries the server's whole error body on purpose, and the connection's
+# actions carry frames: boxing them buys nothing here.
+result_large_err = "allow"
+large_enum_variant = "allow"
+collapsible_if = "allow"
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 2
+
+[profile.release]
+lto = "thin"
+codegen-units = 4
+strip = "debuginfo"

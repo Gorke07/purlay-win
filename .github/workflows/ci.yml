@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Fetch the pinned contract bundle
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: cargo xtask contract fetch
+
+      - name: Generated code is current
+        run: cargo xtask generate --check
+
+      - name: Tests
+        run: cargo test --workspace
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Release build
+        run: cargo build --release -p purlay-app
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: purlay-windows-x64
+          path: target/release/purlay.exe

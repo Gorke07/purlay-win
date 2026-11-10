@@ -1,0 +1,31 @@
+Purlay for Windows
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU Affero General Public License as published by the Free
+Software Foundation, either version 3 of the License, or (at your option) any
+later version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License along
+with this program. If not, see <https://www.gnu.org/licenses/>.
+
+Its realtime engine, sign-in flow and contract handling follow the Purlay web
+client (github.com/doancan/purlay) and Purlay for macOS
+(github.com/doancan/purlay-macos), both AGPL-3.0, Copyright (C) 2026 Dogancan
+Kalipcilar. The wire types and design tokens are generated from the Purlay
+server's contract bundle.
+
+---
+
+Third-party components:
+
+- GPUI Kit (gpui-kit, gpui-base, gpui-component), Apache-2.0, Longbridge.
+- GPUI, Apache-2.0, Zed Industries.
+- Lucide icons, ISC License (crates/purlay-app/assets/LICENSE-LUCIDE).
+- markdown (markdown-rs), MIT, Titus Wormer.
+- tokio, reqwest, tokio-tungstenite, serde and other crates under MIT and/or
+  Apache-2.0; see each crate's license in Cargo.lock's dependency tree
+  (`cargo about` or `cargo license` lists them).
