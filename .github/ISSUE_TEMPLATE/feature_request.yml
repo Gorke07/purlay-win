@@ -1,0 +1,29 @@
+name: Feature request
+description: Suggest something Purlay for Windows could do.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Features that need the server to store or send something new belong in
+        [doancan/purlay](https://github.com/doancan/purlay/issues); this repository is for the Windows app.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: The situation and what gets in the way today.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help
+      description: How it could work. Mention another app (Teams, Discord, Slack, Purlay for macOS) if it does this well.
+    validations:
+      required: true
+  - type: checkboxes
+    id: server
+    attributes:
+      label: Server
+      options:
+        - label: This needs a change on the Purlay server or in the wire contract.

@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Server, web app or wire contract
+    url: https://github.com/doancan/purlay/issues
+    about: Problems and ideas that are not specific to the Windows app.
+  - name: Purlay for macOS
+    url: https://github.com/doancan/purlay-macos/issues
+    about: Issues with the Mac app.
+  - name: Security problem
+    url: https://github.com/Gorke07/purlay-win/security/advisories/new
+    about: Report privately, not in a public issue.

@@ -1,0 +1,62 @@
+name: Bug report
+description: Something in Purlay for Windows does not work as it should.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. If the problem is on the server or also happens in the web app, please report it to
+        [doancan/purlay](https://github.com/doancan/purlay/issues) instead. For a security problem, use the
+        [private advisory form](https://github.com/Gorke07/purlay-win/security/advisories/new).
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open #general
+        2. …
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Purlay for Windows version
+      description: Settings › General shows it, with the server's version.
+      placeholder: 0.1.0 · server 0.6.1
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      description: Run `winver`.
+      placeholder: Windows 11 24H2 (26100)
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Messages and threads
+        - Sidebar and navigation
+        - Notifications, sounds, tray or taskbar
+        - Sign-in and connection
+        - Search, inbox, saved
+        - Settings
+        - Something else
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: |
+        `%LOCALAPPDATA%\Purlay\Purlay\data\logs\purlay.log` (start the app with `PURLAY_LOG=info,purlay=debug` for more).
+        Remove anything private before pasting.
+      render: text
