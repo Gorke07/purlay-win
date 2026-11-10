@@ -302,7 +302,13 @@ impl AppModel {
                 }
             }
         });
-        self._tasks = vec![t1, t2];
+        // Timed mutes end on this device's clock (until the server holds them, #1379).
+        let s3 = session.clone();
+        let t3 = cx.spawn(async move |_, cx| loop {
+            s3.end_timed_mutes(chrono::Local::now().timestamp_millis());
+            cx.background_executor().timer(std::time::Duration::from_secs(15)).await;
+        });
+        self._tasks = vec![t1, t2, t3];
         self.phase = Phase::Ready(session);
         for l in self.take_pending_links() {
             cx.emit(AppEvent::OpenLink(l));

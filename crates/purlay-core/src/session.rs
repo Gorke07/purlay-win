@@ -436,13 +436,80 @@ impl Session {
         })
     }
 
+    /// Sets a channel's notification level by choice: a timed mute on it ends here.
     pub fn set_notification_level(&self, channel: &Uuid, level: NotificationLevel) -> JoinHandle<ApiResult<()>> {
+        self.forget_timed_mute(channel);
+        self.put_notification_level(channel, level)
+    }
+
+    fn put_notification_level(&self, channel: &Uuid, level: NotificationLevel) -> JoinHandle<ApiResult<()>> {
         let api = self.api.clone();
         let c = channel.clone();
         let l = level.clone();
         self.channel_patch(async move { api.set_notification_level(&c, &SetNotificationLevelRequest { level: l }).await }, channel, move |ch| {
             ch.notification_level = Some(level)
         })
+    }
+
+    // --- timed mutes (kept on this device until the server holds the end, #1379) -------
+
+    fn mute_key(&self, channel: &Uuid) -> String {
+        format!("{}|{}", self.server_key(), channel)
+    }
+
+    /// Silences a channel until `until_ms`, then gives it back the level it had.
+    pub fn mute_until(&self, channel: &Uuid, until_ms: i64) -> JoinHandle<ApiResult<()>> {
+        let key = self.mute_key(channel);
+        // Muting again keeps the level from before the first mute.
+        let restore = self.prefs.get().timed_mutes.get(&key).map(|m| m.restore.clone()).unwrap_or_else(|| {
+            match self.store().read_recursive().channel(channel).and_then(|c| c.notification_level.clone()) {
+                Some(NotificationLevel::All) => "all".into(),
+                _ => "mentions".into(),
+            }
+        });
+        self.prefs.update(|d| {
+            d.timed_mutes.insert(key, crate::prefs::TimedMute { until_ms, restore });
+        });
+        self.put_notification_level(channel, NotificationLevel::None)
+    }
+
+    /// When a channel's timed mute ends, if it has one.
+    pub fn muted_until(&self, channel: &Uuid) -> Option<i64> {
+        self.prefs.get().timed_mutes.get(&self.mute_key(channel)).map(|m| m.until_ms)
+    }
+
+    /// Ends a timed mute now, back to the level from before it.
+    pub fn unmute(&self, channel: &Uuid) -> JoinHandle<ApiResult<()>> {
+        let key = self.mute_key(channel);
+        let restore = self.prefs.get().timed_mutes.get(&key).map(|m| m.restore.clone());
+        self.forget_timed_mute(channel);
+        self.put_notification_level(channel, level_from(restore.as_deref()))
+    }
+
+    fn forget_timed_mute(&self, channel: &Uuid) {
+        let key = self.mute_key(channel);
+        if self.prefs.get().timed_mutes.contains_key(&key) {
+            self.prefs.update(|d| {
+                d.timed_mutes.remove(&key);
+            });
+        }
+    }
+
+    /// Ends the timed mutes whose time has come. A channel whose level was changed
+    /// elsewhere meanwhile (no longer `none`) keeps that choice.
+    pub fn end_timed_mutes(&self, now_ms: i64) {
+        let prefix = format!("{}|", self.server_key());
+        let due: Vec<(String, String)> = self.prefs.get().timed_mutes.iter().filter(|(k, m)| k.starts_with(&prefix) && m.until_ms <= now_ms).map(|(k, m)| (k.clone(), m.restore.clone())).collect();
+        for (key, restore) in due {
+            self.prefs.update(|d| {
+                d.timed_mutes.remove(&key);
+            });
+            let channel = Uuid::from(key[prefix.len()..].to_string());
+            let still_muted = self.store().read_recursive().channel(&channel).is_none_or(|c| c.notification_level == Some(NotificationLevel::None));
+            if still_muted {
+                drop(self.put_notification_level(&channel, level_from(Some(&restore))));
+            }
+        }
     }
 
     pub fn join(&self, channel: &Uuid) -> JoinHandle<ApiResult<()>> {
@@ -632,4 +699,11 @@ impl NowCompat for SystemClock {
 
 pub fn is_transient(e: &ApiError) -> bool {
     e.is_transient()
+}
+
+fn level_from(s: Option<&str>) -> NotificationLevel {
+    match s {
+        Some("all") => NotificationLevel::All,
+        _ => NotificationLevel::Mentions,
+    }
 }

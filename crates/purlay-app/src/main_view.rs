@@ -238,6 +238,35 @@ impl MainView {
                 ico(if ch.r#type == purlay_core::contract::models::ChannelType::Private { "lock" } else { "hash" }, 16., k.ink).into_any_element()
             };
             let topic = ch.topic.clone().filter(|t| !t.is_empty());
+            // Muted: says so, with when it ends; a click ends a timed mute now.
+            let muted = ch.notification_level == Some(purlay_core::contract::models::NotificationLevel::None);
+            let until = s.muted_until(&ch.id);
+            let mute_chip = muted.then(|| {
+                let (s2, id2) = (s.clone(), ch.id.clone());
+                let text = match until {
+                    Some(u) => tf("mute.until", &[&crate::sidebar::mute_end_text(u)]),
+                    None => t("mute.muted").to_string(),
+                };
+                let hover = k.ink.opacity(0.07);
+                h_flex()
+                    .id("mute-chip")
+                    .flex_none()
+                    .gap_1()
+                    .px_2()
+                    .h(px(22.))
+                    .rounded_full()
+                    .bg(k.surface_200)
+                    .occlude()
+                    .when(until.is_some(), |d| d.cursor_pointer().hover(move |st| st.bg(hover)))
+                    .tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(if until.is_some() { t("mute.end") } else { t("channel.notify.none") }).build(w, cx))
+                    .child(ico("bell-off", 12., k.ink_muted))
+                    .child(text_style(div(), purlay_tokens::typography::CAPTION, cx).text_color(k.ink_muted).whitespace_nowrap().child(text))
+                    .on_click(move |_, _, _| {
+                        if until.is_some() {
+                            s2.unmute(&id2);
+                        }
+                    })
+            });
             h_flex()
                 .min_w_0()
                 .gap(px(6.))
@@ -250,6 +279,7 @@ impl MainView {
                             d.child(text_style(div(), purlay_tokens::typography::CAPTION, cx).text_color(k.ink_muted).whitespace_nowrap().overflow_hidden().text_ellipsis().child(tp))
                         }),
                 )
+                .children(mute_chip)
                 .into_any_element()
         });
 

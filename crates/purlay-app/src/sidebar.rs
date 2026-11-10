@@ -126,6 +126,7 @@ impl SidebarView {
             .when_some(ch.incident.as_ref(), |d, i| {
                 d.child(div().px_1().rounded(px(4.)).bg(k.danger_subtle).text_color(k.danger_text).text_size(px(10.)).child(format!("SEV{}", i.severity)))
             })
+            .when(muted, |d| d.child(ico("bell-off", 13., k.nav_ink_muted)))
             .when(mentions > 0 && !muted, |d| d.child(count_badge(mentions, cx)))
             .on_click(move |_, _, cx| nav.update(cx, |n, cx| n.open_channel(&id, cx)));
         // The menu wraps an outer box so the row keeps its hover style.
@@ -171,12 +172,31 @@ pub fn channel_menu(menu: gpui_kit::component::menu::PopupMenu, ch: &Channel, ap
         menu = menu.item(PopupMenuItem::new(t("sidebar.markAllRead")).on_click(move |_, _, _| s2.mark_read(&i2, &n)));
     }
     menu = menu.separator().label(t("channel.notify"));
+    let muted_until = s.muted_until(&id);
     for (lv, key) in [(NotificationLevel::All, "channel.notify.all"), (NotificationLevel::Mentions, "channel.notify.mentions"), (NotificationLevel::None, "channel.notify.none")] {
         let s3 = s.clone();
         let i3 = id.clone();
-        let checked = level.as_ref() == Some(&lv) || (level.is_none() && lv == NotificationLevel::Mentions);
+        // A timed mute is shown below, not as "Nothing".
+        let checked = muted_until.is_none() && (level.as_ref() == Some(&lv) || (level.is_none() && lv == NotificationLevel::Mentions));
         menu = menu.item(PopupMenuItem::new(t(key)).checked(checked).on_click(move |_, _, _| {
             s3.set_notification_level(&i3, lv.clone());
+        }));
+    }
+    // Mute for a while: the level comes back by itself (UX of Discord's timed mute).
+    menu = menu.separator();
+    if let Some(until) = muted_until {
+        menu = menu.label(tf("mute.until", &[&mute_end_text(until)]));
+        let (s5, i5) = (s.clone(), id.clone());
+        menu = menu.item(PopupMenuItem::new(t("mute.end")).on_click(move |_, _, _| {
+            s5.unmute(&i5);
+        }));
+    } else {
+        menu = menu.label(t("mute.title"));
+    }
+    for (key, mins) in [("mute.15m", 15i64), ("mute.1h", 60), ("mute.8h", 480), ("mute.24h", 1440), ("mute.tomorrow", -1)] {
+        let (s4, i4) = (s.clone(), id.clone());
+        menu = menu.item(PopupMenuItem::new(t(key)).on_click(move |_, _, _| {
+            s4.mute_until(&i4, mute_end(mins));
         }));
     }
     if ch.r#type != ChannelType::DirectMessage {
@@ -507,4 +527,26 @@ pub fn deep_work_until(mins: i64) -> Timestamp {
         now + Duration::minutes(mins)
     };
     Timestamp::from_unix_ms(until.timestamp_millis())
+}
+
+/// When a mute of `mins` minutes ends; `-1` is tomorrow at 09:00.
+pub fn mute_end(mins: i64) -> i64 {
+    use chrono::{Duration, Local, TimeZone};
+    let now = Local::now();
+    if mins < 0 {
+        let tomorrow = now.date_naive().succ_opt().unwrap_or(now.date_naive());
+        return Local.from_local_datetime(&tomorrow.and_hms_opt(9, 0, 0).unwrap()).single().map(|t| t.timestamp_millis()).unwrap_or(now.timestamp_millis() + 12 * 3_600_000);
+    }
+    (now + Duration::minutes(mins)).timestamp_millis()
+}
+
+/// "18:30" today, "tomorrow 09:00", otherwise the day and time.
+pub fn mute_end_text(ms: i64) -> String {
+    if same_day(ms, now_ms()) {
+        clock_time(ms)
+    } else if same_day(ms, now_ms() + 86_400_000) {
+        tf("time.tomorrowAt", &[&clock_time(ms)])
+    } else {
+        short_datetime(ms)
+    }
 }

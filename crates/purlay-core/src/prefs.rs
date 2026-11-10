@@ -80,6 +80,9 @@ pub struct Data {
     pub notification_style: NotificationStyle,
     /// No count on the taskbar button.
     pub hide_taskbar_badge: bool,
+    /// `<server>|<channel>` → a mute that ends by itself (kept here until the server can
+    /// hold the end time, doancan/purlay#1379).
+    pub timed_mutes: BTreeMap<String, TimedMute>,
     /// Closing the window quits instead of leaving Purlay in the notification area.
     pub quit_on_close: bool,
     /// The one-time still running notice was shown.
@@ -93,6 +96,15 @@ pub struct Data {
     /// Emoji used recently, newest first.
     pub recent_emoji: Vec<String>,
     pub window: Option<WindowState>,
+}
+
+/// A channel muted until a moment, and the level it goes back to then.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TimedMute {
+    pub until_ms: i64,
+    /// `all` or `mentions`.
+    pub restore: String,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]

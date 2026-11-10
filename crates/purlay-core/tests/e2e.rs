@@ -217,3 +217,36 @@ async fn an_unsent_message_survives_a_restart_as_failed_and_retries() {
     until(&s, "outbox empty", |st| st.pending.is_empty()).await;
     s.send(Command::Shutdown);
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_timed_mute_silences_then_gives_the_old_level_back() {
+    let h = server().await;
+    let dir = tempfile::tempdir().unwrap();
+    let (s, _ev) = open(&h, "ada", dir.path()).await;
+    let g = general(&h);
+    let w = h.workspace_id();
+    until(&s, "channels", |st| st.channels.get(&w).is_some_and(|m| m.contains_key(&g))).await;
+    s.set_notification_level(&g, NotificationLevel::All).await.unwrap().unwrap();
+
+    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as i64;
+    s.mute_until(&g, now + 60_000).await.unwrap().unwrap();
+    assert_eq!(s.muted_until(&g), Some(now + 60_000));
+    until(&s, "muted", |st| st.channel(&g).is_some_and(|c| c.notification_level == Some(NotificationLevel::None))).await;
+
+    // Muting again keeps the level from before the first mute.
+    s.mute_until(&g, now + 120_000).await.unwrap().unwrap();
+    // Not yet due: nothing changes.
+    s.end_timed_mutes(now + 30_000);
+    assert!(s.muted_until(&g).is_some());
+    // Due: back to "all", and the mute is forgotten.
+    s.end_timed_mutes(now + 200_000);
+    assert_eq!(s.muted_until(&g), None);
+    until(&s, "restored", |st| st.channel(&g).is_some_and(|c| c.notification_level == Some(NotificationLevel::All))).await;
+
+    // A level chosen by hand ends a timed mute without waiting.
+    s.mute_until(&g, now + 60_000).await.unwrap().unwrap();
+    s.set_notification_level(&g, NotificationLevel::Mentions).await.unwrap().unwrap();
+    assert_eq!(s.muted_until(&g), None);
+    s.end_timed_mutes(now + 200_000);
+    until(&s, "kept the hand choice", |st| st.channel(&g).is_some_and(|c| c.notification_level == Some(NotificationLevel::Mentions))).await;
+}
