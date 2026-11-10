@@ -157,6 +157,8 @@ pub fn channel_menu(menu: gpui_kit::component::menu::PopupMenu, ch: &Channel, ap
     let (id, starred) = (ch.id.clone(), ch.starred);
     let level = ch.notification_level.clone();
     let mut menu = menu;
+    let (app_p, ch_p) = (app.clone(), id.clone());
+    menu = menu.item(PopupMenuItem::new(t("popout.open")).on_click(move |_, _, cx| crate::popout::open(app_p.clone(), ch_p.clone(), cx)));
     if ch.r#type != ChannelType::DirectMessage {
         let s1 = s.clone();
         let i1 = id.clone();

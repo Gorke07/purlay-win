@@ -38,6 +38,9 @@ mod other {
     pub fn do_not_disturb() -> bool {
         false
     }
+    pub fn animations_enabled() -> bool {
+        true
+    }
 }
 #[cfg(not(windows))]
 pub use other::*;

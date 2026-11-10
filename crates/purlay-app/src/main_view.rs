@@ -537,6 +537,11 @@ impl Render for MainView {
             .on_action(cx.listener(|this, _: &OpenSettings, _, cx| this.nav.update(cx, |n, cx| n.go(Route::Settings, cx))))
             .on_action(cx.listener(|this, _: &GoBack, _, cx| this.nav.update(cx, |n, cx| n.go_back(cx))))
             .on_action(cx.listener(|this, _: &NextUnread, _, cx| this.nav.update(cx, |n, cx| n.step_unread(true, cx))))
+            .on_action(cx.listener(|this, _: &PopOut, _, cx| {
+                if let Some(ch) = this.nav.read(cx).current_channel().cloned() {
+                    crate::popout::open(this.app.clone(), ch, cx);
+                }
+            }))
             .on_action(cx.listener(|this, _: &NextChannel, _, cx| this.nav.update(cx, |n, cx| n.step_channel(true, cx))))
             .on_action(cx.listener(|this, _: &PrevChannel, _, cx| this.nav.update(cx, |n, cx| n.step_channel(false, cx))))
             .on_action(cx.listener(|this, _: &JumpToUnread, _, cx| {

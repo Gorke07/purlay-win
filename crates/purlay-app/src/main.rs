@@ -18,6 +18,7 @@ mod message;
 mod nav;
 mod pages;
 mod palette;
+mod popout;
 mod panels;
 mod root;
 mod settings;

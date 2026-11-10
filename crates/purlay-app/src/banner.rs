@@ -484,7 +484,8 @@ impl Render for BannerView {
                     .when(!self.compact, |d| d.pt(px(10.)).gap(px(8.)).child(header))
                     .when(self.compact, |d| d.justify_center().gap_1())
                     .child(body)
-                    .with_animation("banner-in", Animation::new(Duration::from_millis(260)).with_easing(ease_out_quint()), |el, d| {
+                    // Slides in, unless Windows is set to show no animations.
+                    .with_animation("banner-in", Animation::new(Duration::from_millis(if purlay_platform::animations_enabled() { 260 } else { 1 })).with_easing(ease_out_quint()), |el, d| {
                         el.ml(px(28. * (1. - d))).opacity(d)
                     }),
             )

@@ -51,7 +51,8 @@ impl RootView {
         subs.push(cx.observe_window_activation(window, |this, window, cx| {
             let active = window.is_window_active();
             crate::tray::refresh_badge();
-            this.app.update(cx, |m, cx| m.set_window_active(active, cx));
+            let id = window.window_handle().window_id().as_u64();
+            this.app.update(cx, |m, cx| m.set_window_active(id, active, cx));
         }));
         // Prefill the last server.
         let last = app.read(cx).prefs.get().servers.last().map(|s| s.address.clone());

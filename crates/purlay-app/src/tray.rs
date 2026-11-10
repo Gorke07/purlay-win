@@ -314,6 +314,20 @@ pub fn sync_attention(app: &Entity<crate::state::AppModel>, cx: &mut App) {
     }
 }
 
+
+/// Keeps a window above all others (or lets it go back among them).
+pub fn set_topmost(window: &Window, on: bool) {
+    #[cfg(windows)]
+    if let Some(h) = hwnd(window) {
+        use windows::Win32::UI::WindowsAndMessaging::{SetWindowPos, HWND_NOTOPMOST, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE};
+        unsafe {
+            let _ = SetWindowPos(h, Some(if on { HWND_TOPMOST } else { HWND_NOTOPMOST }), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+        }
+    }
+    #[cfg(not(windows))]
+    let _ = (window, on);
+}
+
 #[cfg(test)]
 mod tests {
     use super::{base_icon, with_dot, SIZE};

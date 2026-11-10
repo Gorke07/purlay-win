@@ -41,6 +41,7 @@ pub struct AppModel {
     pub data_dir: Option<PathBuf>,
     pub phase: Phase,
     pub window_active: bool,
+    active_windows: std::collections::HashSet<u64>,
     pending_links: Vec<String>,
     _tasks: Vec<Task<()>>,
 }
@@ -56,7 +57,7 @@ pub fn app(cx: &App) -> Entity<AppModel> {
 
 impl AppModel {
     pub fn new(rt: tokio::runtime::Handle, prefs: Prefs, data_dir: Option<PathBuf>, cx: &mut Context<Self>) -> Self {
-        let mut m = AppModel { rt, prefs, data_dir, phase: Phase::Connect { error: None, busy: false }, window_active: true, pending_links: vec![], _tasks: vec![] };
+        let mut m = AppModel { rt, prefs, data_dir, phase: Phase::Connect { error: None, busy: false }, window_active: true, active_windows: std::collections::HashSet::new(), pending_links: vec![], _tasks: vec![] };
         m.resume(cx);
         m
     }
@@ -435,9 +436,17 @@ impl AppModel {
         }
     }
 
-    pub fn set_window_active(&mut self, active: bool, cx: &mut Context<Self>) {
-        if self.window_active != active {
-            self.window_active = active;
+    /// A Purlay window came to the front or left it. Purlay counts as in front while any
+    /// of its windows is (the main one or a conversation window).
+    pub fn set_window_active(&mut self, window: u64, active: bool, cx: &mut Context<Self>) {
+        if active {
+            self.active_windows.insert(window);
+        } else {
+            self.active_windows.remove(&window);
+        }
+        let now = !self.active_windows.is_empty();
+        if self.window_active != now {
+            self.window_active = now;
             cx.notify();
         }
     }

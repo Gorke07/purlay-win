@@ -54,6 +54,9 @@ pub struct Nav {
     view_keys: HashMap<&'static str, Vec<Key>>,
     sent_keys: BTreeSet<Key>,
     back: Vec<Route>,
+    /// A conversation window's own navigation: it leaves the workspace choice and the
+    /// resources kept live to the main window's.
+    passive: bool,
 }
 
 impl EventEmitter<NavEvent> for Nav {}
@@ -71,9 +74,29 @@ impl Nav {
             view_keys: HashMap::new(),
             sent_keys: BTreeSet::new(),
             back: vec![],
+            passive: false,
         };
         n.pick_workspace(cx);
         n
+    }
+
+    /// Navigation for a conversation window, showing `channel`.
+    pub fn passive(app: Entity<AppModel>, channel: &Uuid, cx: &mut Context<Self>) -> Self {
+        let s = app.read(cx).session().cloned();
+        let workspace = s.and_then(|s| s.store().read_recursive().workspace_of_channel(channel));
+        Nav {
+            app,
+            workspace,
+            route: Route::Channel(channel.clone()),
+            inspector: None,
+            palette: false,
+            shortcuts: false,
+            highlight: None,
+            view_keys: HashMap::new(),
+            sent_keys: BTreeSet::new(),
+            back: vec![],
+            passive: true,
+        }
     }
 
     pub fn session(&self, cx: &App) -> Option<Session> {
@@ -226,6 +249,9 @@ impl Nav {
     }
 
     fn sync_keys(&mut self, cx: &mut Context<Self>) {
+        if self.passive {
+            return;
+        }
         let Some(s) = self.session(cx) else { return };
         let mut keys: BTreeSet<Key> = BTreeSet::new();
         if let Some(w) = &self.workspace {
