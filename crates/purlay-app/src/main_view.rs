@@ -71,8 +71,10 @@ impl MainView {
                 cx.notify();
             }),
             cx.subscribe_in(&app, window, |this, _, e: &AppEvent, _, cx| {
-                if let AppEvent::OpenLink(l) = e {
-                    this.open_link(l, cx);
+                match e {
+                    AppEvent::OpenLink(l) => this.open_link(l, cx),
+                    AppEvent::OpenSettings => this.nav.update(cx, |n, cx| n.go(Route::Settings, cx)),
+                    _ => {}
                 }
             }),
         ];

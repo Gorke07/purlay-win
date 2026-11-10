@@ -148,6 +148,18 @@ impl Render for SettingsPage {
                         }).into_any_element(),
                         cx,
                     ))
+                    .child(row(
+                        t("settings.closeToTray"),
+                        None,
+                        Switch::new("close-to-tray").checked(!prefs.quit_on_close).on_change({
+                            let p = s.prefs.clone();
+                            move |on, _, cx| {
+                                p.update(|d| d.quit_on_close = !*on);
+                                cx.refresh_windows();
+                            }
+                        }).into_any_element(),
+                        cx,
+                    ))
                     .child(row(tf("settings.version", &[&env!("CARGO_PKG_VERSION"), &s.info.server.version]), None, div().into_any_element(), cx))
                     .into_any_element()
             }

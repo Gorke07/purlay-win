@@ -31,6 +31,8 @@ pub enum AppEvent {
     /// A `purlay://open?url=…` (or web permalink) to show.
     OpenLink(String),
     SessionEnded,
+    /// Settings were asked for from outside the window (the tray menu).
+    OpenSettings,
 }
 
 pub struct AppModel {
@@ -373,6 +375,10 @@ impl AppModel {
         if prefs.notification_sound && !system {
             play_tone(prefs.notification_tone);
         }
+    }
+
+    pub fn open_settings(&mut self, cx: &mut Context<Self>) {
+        cx.emit(AppEvent::OpenSettings);
     }
 
     pub fn sign_out(&mut self, everywhere: bool, cx: &mut Context<Self>) {

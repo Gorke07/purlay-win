@@ -46,7 +46,7 @@ impl RootView {
         subs.push(cx.subscribe_in(&app, window, |_this, _, e: &AppEvent, window, cx| match e {
             AppEvent::Notice(s) => window.push_notification(s.clone(), cx),
             AppEvent::SessionEnded => window.push_notification(t("session.ended"), cx),
-            AppEvent::OpenLink(_) => {}
+            AppEvent::OpenLink(_) | AppEvent::OpenSettings => {}
         }));
         subs.push(cx.observe_window_activation(window, |this, window, cx| {
             let active = window.is_window_active();
@@ -189,6 +189,8 @@ impl Render for RootView {
             "Purlay".to_string()
         };
         window.set_window_title(&title_text);
+        let waiting = if ready { self.app.read(cx).session().map(|s| s.store().read_recursive().attention_count()).unwrap_or(0) } else { 0 };
+        crate::tray::set_unread(waiting, cx);
         // Signed in, the main view draws the frame (sidebar to the top, toolbar beside the
         // caption buttons); before that, a bare draggable strip is enough.
         v_flex()

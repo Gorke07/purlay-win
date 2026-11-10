@@ -68,6 +68,10 @@ pub struct Data {
     pub notifications_enabled: bool,
     pub notification_sound: bool,
     pub notification_tone: NotificationTone,
+    /// Closing the window quits instead of leaving Purlay in the notification area.
+    pub quit_on_close: bool,
+    /// The one-time still running notice was shown.
+    pub tray_hint_shown: bool,
     /// key → text
     pub drafts: BTreeMap<String, String>,
     /// `<server>|<user>|<workspace>` → newest first

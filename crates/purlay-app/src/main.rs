@@ -24,6 +24,7 @@ mod sidebar;
 mod state;
 mod theme;
 mod thread;
+mod tray;
 mod ui;
 
 use gpui_kit::component::TitleBar;
@@ -117,13 +118,46 @@ fn main() {
                 })
                 .detach();
             let prefs3 = prefs.clone();
-            window.on_window_should_close(cx, move |window, _| {
+            window.on_window_should_close(cx, move |window, cx| {
                 save_window(&prefs3, window);
+                // With the tray icon, closing hides the window and Purlay keeps running.
+                if tray::installed(cx) && !prefs3.get().quit_on_close {
+                    tray::hide_window(window);
+                    if !prefs3.get().tray_hint_shown {
+                        prefs3.update(|d| d.tray_hint_shown = true);
+                        purlay_platform::toast(i18n::t("tray.stillRunning"), i18n::t("tray.stillRunningBody"), None, true);
+                    }
+                    return false;
+                }
                 true
             });
             cx.new(|cx| root::RootView::new(window, cx))
         })
         .expect("open window");
+
+        // The tray: a click shows the window, the menu opens settings or quits.
+        if let Some(mut commands) = tray::install(cx) {
+            let app3 = app.clone();
+            let prefs4 = prefs.clone();
+            cx.spawn(async move |cx| {
+                while let Some(cmd) = commands.recv().await {
+                    cx.update(|cx| {
+                        let _ = window.update(cx, |_, window, cx| match cmd {
+                            tray::TrayCommand::Show => tray::show_window(window),
+                            tray::TrayCommand::Settings => {
+                                tray::show_window(window);
+                                app3.update(cx, |m, cx| m.open_settings(cx));
+                            }
+                            tray::TrayCommand::Quit => save_window(&prefs4, window),
+                        });
+                        if cmd == tray::TrayCommand::Quit {
+                            cx.quit();
+                        }
+                    });
+                }
+            })
+            .detach();
+        }
 
         if let Some(url) = initial_url.clone() {
             app.update(cx, |m, cx| m.handle_url(url, cx));
@@ -139,9 +173,7 @@ fn main() {
                     if let Some(u) = url {
                         app2.update(cx, |m, cx| m.handle_url(u, cx));
                     }
-                    let _ = window.update(cx, |_, window, _| {
-                        window.activate_window();
-                    });
+                    let _ = window.update(cx, |_, window, _| tray::show_window(window));
                 });
             }
         })
